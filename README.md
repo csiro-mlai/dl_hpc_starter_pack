@@ -18,15 +18,7 @@ Most of this is accomplished by leveraging [PyTorch Lightning](https://pytorch-l
 
 Overview of the repository. ***The most important parts are: `task`, `config`, `models`, and `stages`.***
 ```
-├──  task  
-│    │
-│    └── TASK_NAME     - name of the task, e.g., cifar10.
-│        └── config    - .yaml configuration files for a model.
-│        └── models    - .py modules that contain pytorch_lightning.LightningModule definitions that represent models.
-│        └── stages.py - training and testing stages for a task.
-│
-│
-├──  transmodal
+├──  src
 │    │
 │    └── tools                     - for all other modules; tools that are repeadetly used.
 │    └── cluster.py                - contains the cluster management object.
@@ -35,11 +27,25 @@ Overview of the repository. ***The most important parts are: `task`, `config`, `
 │    └── utils.py                  - small utility definitions.
 │
 │
+│
+│
+├──  task  
+│    │
+│    └── TASK_NAME     - name of the task, e.g., cifar10.
+│        └── config    - .yaml configuration files for a model.
+│        └── models    - .py modules that contain pytorch_lightning.LightningModule definitions that represent models.
+│        └── stages.py - training and testing stages for a task.
+│
+│
+│
+│
 ├──  main.py - main.py does the following:
 │               1. Reads command line arguments using argparse.
 │               2. Imports the 'stages' function for the task from task/TASK_NAME/stages.py.
 │               3. Loads the specified configuration .yaml for the job from task/TASK_NAME/config.
 │               4. Submits the job (the configuration + 'stages') to the cluster manager (or runs it locally if 'submit' is false).
+│
+│
 │
 │
 ├──  requirements.txt - Packages required by the library (pip install -r requirements.txt).
@@ -87,7 +93,7 @@ Once we have created our task directory (e.g., `task/cifar10`), we now want to c
 
 ***Example:***
 
- - An example model for `cifar10` is in [task/cifar10/model/baseline.py](https://github.com/aehrc/transmodal/blob/simplified_22/task/cifar10/model/baseline.py). 
+ - An example model for `cifar10` is in [task/cifar10/model/baseline.py](https://github.com/csiro-mlai/dl_hpc_starter_pack/blob/main/task/cifar10/model/baseline.py). 
 
 # Innovate via Model Composition & Inheritance
 
@@ -308,14 +314,14 @@ Typically, the following things happen in `stages()`:
     Model = importer(definition=args.definition, module='.'.join(['task', args.task, 'model', args.module])
     model = Model(**vars(args))
    ```
-    See `transmodal.utils.importer` for a handy function that imports based on strings.
+    See `src.utils.importer` for a handy function that imports based on strings.
  - A `pytorch_lightning.Trainer` instance is created, e.g., `trainer = pytorch_lightning.Trainer(...)`.
  - The model is trained using trainer: `trainer.fit(model)`.
  - The model is tested using trainer: `trainer.test(model)`.
 
 It handles the training and testing of a model for a task by using a [`pytorch_lightning.Trainer`](https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html).
 
-***A helpful wrapper at `transmodal/trainer.py` exists that passes frequently used and useful `callbacks`, `loggers`, and `plugins` to a `pytorch_lightning.Trainer` instance:***
+***A helpful wrapper at `src/trainer.py` exists that passes frequently used and useful `callbacks`, `loggers`, and `plugins` to a `pytorch_lightning.Trainer` instance:***
 
 ```python
 from src.trainer import trainer_instance
@@ -337,7 +343,7 @@ The main function does the following:
     ```shell
     python3 main.py --config baseline --task cifar10
     ```
- - Imports the `stages` definition for the task using `transmodal.utils.importer`.
+ - Imports the `stages` definition for the task using `src.utils.importer`.
  - Reads the configuration `.yaml` and combines it with the command line arguments.
  - Submits `stages` to the cluster manager if `args.submit = True` or runs `stages` locally. The command line arguments and the configuration arguments are passed to `stages` in both cases.
 
