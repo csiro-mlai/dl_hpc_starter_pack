@@ -1,0 +1,24 @@
+submit: True
+num_gpus: 2
+time_limit: '02:00:00'
+memory: '32GB'
+resumable: True
+
+# Neptune.ai monitoring.
+neptune_api_key: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxNWE0MTA5OS0yNTBhLTRlYTAtYjRjMC05MmRjMWM3Njg2ZDcifQ==
+neptune_username: anicolson
+
+train: True
+test: True
+module: baseline_adamw
+definition: Baseline
+monitor: 'val_acc'
+monitor_mode: 'max'
+lr: 1e-4
+max_epochs: 64
+mbatch_size: 64
+num_workers: 5
+exp_dir: /datasets/work/hb-imageclef/work/experiments
+dataset_dir: /datasets/work/hb-mlaifsp-mm/source/Datasets
+venv_path: /scratch2/nic261/environments/simplified_12_08_22/bin/activate
+
