@@ -309,7 +309,7 @@ Typically, the following things happen in `stages()`:
 
  - The `LightningModule` model is imported via the `model` argument, e.g.,
     ```python
-    from app.utils import importer
+    from src.utils import importer
    
     Model = importer(definition=args.definition, module='.'.join(['task', args.task, 'model', args.module])
     model = Model(**vars(args))
@@ -324,7 +324,7 @@ It handles the training and testing of a model for a task by using a [`pytorch_l
 ***A helpful wrapper at `transmodal/trainer.py` exists that passes frequently used and useful `callbacks`, `loggers`, and `plugins` to a `pytorch_lightning.Trainer` instance:***
 
 ```python
-from app.trainer import trainer_instance
+from src.trainer import trainer_instance
 
 trainer = trainer_instance(**vars(args))
 ```

@@ -1,7 +1,7 @@
 from argparse import Namespace
-from app.command_line_arguments import read_command_line_arguments
-from app.utils import importer, gpu_usage_and_visibility, load_config_and_update_args
-from app.cluster import ClusterSubmit
+from src.command_line_arguments import read_command_line_arguments
+from src.utils import importer, gpu_usage_and_visibility, load_config_and_update_args
+from src.cluster import ClusterSubmit
 from typing import Callable
 
 
