@@ -1,10 +1,4 @@
-[//]: # (# In developement...)
-
-# Transmodal
-
----
-
-**Transmodal meaning**: Crossing, occurring in, or using more than one mode or modality. ***The name could be changed to something that fits the current state of the repo more.***
+![](/src/image.png)
 
 ***Aims of this library:***
 
@@ -12,7 +6,7 @@
  - To reduce the time taken from implementation to results.
  - To promote rapid innovation of models via configuration files, class composition and/or class inheritance.
  - Reduce boilerplate code (sections of code that are repeated in multiple places with little to no variation).
- - To simplify cluster management and distributed computing for the user.
+ - To simplify cluster management and distributed computing with High Performance Computing (HPC).
  - Be able to easily accommodate multiple research avenues simultaneously.
 
 Most of this is accomplished by leveraging [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/), familiarity with it is recommended.
