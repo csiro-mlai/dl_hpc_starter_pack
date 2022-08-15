@@ -8,6 +8,7 @@
  - Reduce boilerplate code (sections of code that are repeated in multiple places with little to no variation).
  - To simplify cluster management and distributed computing with High Performance Computing (HPC).
  - Be able to easily accommodate multiple research avenues simultaneously.
+ - To cooperatively improve the functionality and documentation of this repository to make it better!
 
 Most of this is accomplished by leveraging [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/), familiarity with it is recommended.
 
