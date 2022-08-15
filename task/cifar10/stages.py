@@ -1,8 +1,8 @@
 from argparse import Namespace
 from pytorch_lightning.utilities.seed import seed_everything
-from lib.tools.ext.collect_env_details import main as collect_env_details
-from lib.trainer import trainer_instance
-from lib.utils import get_test_ckpt_path, importer, load_config_and_update_args, write_test_ckpt_path
+from app.tools.ext.collect_env_details import main as collect_env_details
+from app.trainer import trainer_instance
+from app.utils import get_test_ckpt_path, importer, load_config_and_update_args, write_test_ckpt_path
 
 
 def stages(args: Namespace):
