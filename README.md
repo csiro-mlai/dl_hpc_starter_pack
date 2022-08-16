@@ -173,7 +173,7 @@ from transformers import get_constant_schedule_with_warmup
 class Inheritance(Baseline):
 
     def __init__(self, num_warmup_steps, **kwargs):
-        super(DenseNetAdamW, self).__init__(**kwargs)
+        super(Inheritance, self).__init__(**kwargs)
         self.save_hyperparameters()
         self.num_warmup_steps = num_warmup_steps
         self.model = torchvision.models.densenet121(...)
