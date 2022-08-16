@@ -12,14 +12,19 @@
 
 Most of this is accomplished by leveraging [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/), familiarity with it is recommended.
 
-# Repository Wish List
 
----
+# Table of Contents
 
- - Add description about Neptune.ai.
- - Use Hydra instead of argparse (or have the option to use either).
- - Ray Tune for hyperparameter optimisation.
- - Usable with notebooks.
+- [Repository map](#repository-map)
+- [Tasks](#tasks)
+- [Models](#models)
+- [Innovate via Model Composition & Inheritance](#innovate-via-model-composition---inheritance)
+- [Configuration `.yaml` files and `argparse`](#configuration--yaml--files-and--argparse-)
+- [Innovate via Configuration Files](#innovate-via-configuration-files)
+- [Stages & `pytorch_lightning.Trainer`](#stages----pytorch-lightningtrainer-)
+- [Tying it all together: `main.py`](#tying-it-all-together---mainpy-)
+- [Cluster manager arguments & distributed computing](#cluster-manager-arguments---distributed-computing)
+- [Repository Wish List](#repository-wish-list)
 
 # Repository map
 
@@ -414,3 +419,13 @@ And executed with:
 ```shell
  python3 main.py --config baseline --task cifar10
  ```
+
+
+# Repository Wish List
+
+---
+
+ - Add description about Neptune.ai.
+ - Use Hydra instead of argparse (or have the option to use either).
+ - Ray Tune for hyperparameter optimisation.
+ - Usable with notebooks.
