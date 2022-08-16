@@ -425,7 +425,8 @@ And executed with:
 
 ---
 
- - Add description about Neptune.ai.
- - Use Hydra instead of argparse (or have the option to use either).
- - Ray Tune for hyperparameter optimisation.
- - Usable with notebooks.
+ - Add description about how to use https://neptune.ai/.
+ - Use https://hydra.cc/ instead of argparse (or have the option to use either).
+ - https://docs.ray.io/en/latest/tune/index.html for hyperparameter optimisation.
+ - Notebook examples.
+
