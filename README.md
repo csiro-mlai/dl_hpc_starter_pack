@@ -12,6 +12,16 @@
 
 Most of this is accomplished by leveraging [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/), familiarity with it is recommended.
 
+# Repository Wish List
+
+---
+
+ - Add description about Neptune.ai.
+ - Use Hydra instead of argparse (or have the option to use either).
+ - Ray Tune for hyperparameter optimisation.
+ - A more foolproof way to combine command line arguments and the configuration arguments.
+ - Usable with notebooks.
+
 # Repository map
 
 ---
@@ -405,13 +415,3 @@ And executed with:
 ```shell
  python3 main.py --config baseline --task cifar10
  ```
-
-# Repository Wish List
-
----
-
- - Add description about Neptune.ai.
- - Use Hydra instead of argparse (or have the option to use either).
- - Ray Tune for hyperparameter optimisation.
- - A more foolproof way to combine command line arguments and the configuration arguments.
- - Usable with notebooks.
