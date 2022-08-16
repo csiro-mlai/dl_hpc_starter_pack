@@ -194,34 +194,35 @@ from pytorch_lightning import LightningModule
 
 class Composition(LightningModule):
     def __init__(self, **kwargs):
-        Baseline.__init__(self, **kwargs)
+        self.baseline = Baseline(self, **kwargs)
+        self.inheritance = Inheritance  # don't want __init__.
 
     def setup(self, stage=None):
-        Baseline.setup(self, stage)
+        self.baseline.setup(stage)
 
     def train_dataloader(self, shuffle=True):
-        return Baseline.train_dataloader(self, shuffle)
+        return self.baseline.train_dataloader(shuffle)
 
     def val_dataloader(self):
-        return Baseline.val_dataloader(self)
+        return self.baseline.val_dataloader()
 
     def test_dataloader(self):
-        return Baseline.test_dataloader(self)
+        return self.baseline.test_dataloader()
 
     def configure_optimizers(self):     
-        return Inheritance.configure_optimizers(self)  # Use configure_optimizers() from Inheritance. 
+        return self.inheritance.configure_optimizers(self)  # Use configure_optimizers() from Inheritance.
 
     def forward(self, images):
-        return Baseline.forward(self, images)
+        return self.baseline.forward(images)
 
     def training_step(self, batch, batch_idx):
-        return Baseline.training_step(self, batch, batch_idx)
+        return self.baseline.training_step(batch, batch_idx)
 
     def validation_step(self, batch, batch_idx):
-        return Baseline.validation_step(self, batch, batch_idx)
+        return self.baseline.validation_step(batch, batch_idx)
 
     def test_step(self, batch, batch_idx):
-        return Baseline.test_step(self, batch, batch_idx)
+        return self.baseline.test_step(batch, batch_idx)
 ```
 
 # Configuration `.yaml` files and `argparse`
