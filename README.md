@@ -496,23 +496,23 @@ The main function does the following:
 
 The following arguments are used for distributed computing:
 
-| Argument      | Description                                                | Default |
-|---------------|------------------------------------------------------------|---------|
-| `num_workers` | No. of workers per DataLoader & GPU                        | `None`  |
-| `num_gpus`    | Number of GPUs per node                                    | `None`  |
-| `num_nodes`   | Number of nodes (should only be used with `submit = True`) | `1`     |
+| Argument      | Description                                                 | Default |
+|---------------|-------------------------------------------------------------|---------|
+| `num_workers` | No. of workers per DataLoader & GPU.                        | `1`     |
+| `num_gpus`    | Number of GPUs per node.                                    | `None`  |
+| `num_nodes`   | Number of nodes (should only be used with `submit = True`). | `1`     |
 
 The following arguments are used to configure a job for a cluster manager (the default cluster manager is SLURM):
 
 | Argument     | Description                                                    | Default      |
 |--------------|----------------------------------------------------------------|--------------|
-| `memory`     | Amount of memory per node                                      | `'16GB'`     |
-| `time_limit` | Job time limit                                                 | `'02:00:00'` |
-| `submit`     | Submit job to the cluster manager                              | `None`       |
-| `resumable`  | Resumable training; Automatic resubmission to cluster manager  | `None`       |
-| `qos`        | Quality of service                                             | `None`       |
-| `begin`      | When to begin the Slurm job, e.g. now+1hour                    | `None`       |
-| `email`      | Email for cluster manager notifications                        | `None`       |
+| `memory`     | Amount of memory per node.                                     | `'16GB'`     |
+| `time_limit` | Job time limit.                                                | `'02:00:00'` |
+| `submit`     | Submit job to the cluster manager.                             | `None`       |
+| `resumable`  | Resumable training; Automatic resubmission to cluster manager. | `None`       |
+| `qos`        | Quality of service.                                            | `None`       |
+| `begin`      | When to begin the Slurm job, e.g. `now+1hour`.                 | `None`       |
+| `email`      | Email for cluster manager notifications.                       | `None`       |
 | `venv_path`  | Path to ''bin/activate'' of a venv.                            | `None`       |
 
 ***These can be given as command line arguments:***
