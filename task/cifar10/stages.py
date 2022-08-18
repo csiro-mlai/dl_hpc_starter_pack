@@ -49,9 +49,9 @@ def stages(args: Namespace):
         else:
 
             # Get the path to the best performing checkpoint
-            ckpt_path = get_test_ckpt_path(args.exp_dir, args.monitor_mode, args.test_epoch, args.test_ckpt_path)
+            ckpt_path = get_test_ckpt_path(args.exp_dir_trial, args.monitor_mode, args.test_epoch, args.test_ckpt_path)
             print('Testing checkpoint: {}.'.format(ckpt_path))
-            write_test_ckpt_path(ckpt_path, args.exp_dir)
+            write_test_ckpt_path(ckpt_path, args.exp_dir_trial)
 
             model = model_def.load_from_checkpoint(checkpoint_path=ckpt_path, **vars(args))
 

@@ -5,7 +5,7 @@ from src.cluster import ClusterSubmit
 from typing import Callable
 
 
-def main():
+def main() -> None:
     """
     The main function handles the jobs for a task. It does the following in order:
         1. Get command line arguments using argparse (or input your own arguments object to main()).
@@ -20,8 +20,6 @@ def main():
 
     # Get command line arguments (or input your own keyword arguments object to main())
     args = read_command_line_arguments()
-    assert args.task, 'The task name must be given as a command line argument, e.g., python3 --task TASK'
-    assert args.config, 'The configuration name must be given as a command line argument, e.g., python3 --config CONFIG'
 
     # Print GPU usage and set GPU visibility
     gpu_usage_and_visibility(args.cuda_visible_devices, args.submit)
@@ -69,11 +67,17 @@ def submit(stages_fnc: Callable, args: Namespace):
 
     else:
 
+        # Defaults
+        args.time_limit = args.time_limit if args.time_limit is not None else '02:00:00'
+        args.num_nodes = args.num_nodes if args.num_nodes is not None else 1
+        args.num_workers = args.num_workers if args.num_workers is not None else 1
+        args.memory = args.memory if args.memory is not None else '16GB'
+
         # Cluster object
         cluster = ClusterSubmit(
             fnc_kwargs=args,
             fnc=stages_fnc,
-            exp_dir=args.exp_dir,
+            save_dir=args.exp_dir_trial,
             time_limit=args.time_limit,
             num_gpus=args.num_gpus,
             num_nodes=args.num_nodes,
@@ -82,10 +86,7 @@ def submit(stages_fnc: Callable, args: Namespace):
         )
 
         # Cluster commands
-        cluster.add_manager_cmd(
-            cmd='tasks-per-node',
-            value=args.num_gpus if args.num_gpus > 0 else 1,
-        )
+        cluster.add_manager_cmd(cmd='tasks-per-node', value=args.num_gpus if args.num_gpus else 1)
 
         # Source virtual environment
         cluster.add_command('source ' + args.venv_path)

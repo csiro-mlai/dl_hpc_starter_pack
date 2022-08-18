@@ -10,7 +10,11 @@
  - Be able to easily accommodate multiple research avenues simultaneously.
  - To cooperatively improve the functionality and documentation of this repository to make it better!
 
-Most of this is accomplished by leveraging [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/), familiarity with it is recommended.
+***Features:***
+ - The [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/) `LightningModule` and `Trainer` are used to implement, train, and test models. It allows for many of the above aims to be accomplished, such as simplified distributed computing and a reduction of boilerplate code. It also allows us to simply use class inheritance and composition, allowing for rapid innovation.
+ - The [Compose API](https://hydra.cc/docs/advanced/compose_api/) of [Hydra](https://hydra.cc/) is used to create a hierarchical configuration, allowing for rapid innovation.
+ - [Neptune.ai](https://neptune.ai/) is used to track experiments; metric scores are automatically uploaded to [Neptune.ai](https://neptune.ai/), allowing you to easily track your experiments from your browser.
+ - Scripts for submission to a cluster manager, such as [SLURM](https://slurm.schedmd.com/documentation.html) are written for you. Also, cluster manager jobs are automatically resubmitted and resumed if they haven't finished before the time-limit.
 
 
 # Table of Contents
@@ -63,7 +67,7 @@ Overview of the repository. ***The most important parts are: `task`, `config`, `
 │
 │
 │
-├──  requirements.txt - Packages required by the library (pip install -r requirements.txt).
+└── requirements.txt - Packages required by the library (pip install -r requirements.txt).
 ```
 
 
@@ -201,15 +205,14 @@ class Inheritance(Baseline):
             }
         return optimiser
 ```
-We could also construct a model that is the combination of the two via composition. For example, we may want to use evarything from `Baseline`, but the optimiser from `Inheritance`:
+We could also construct a model that is the combination of the two via composition. For example, we may want to use everything from `Baseline`, but the optimiser from `Inheritance`:
 
 ```python
 from pytorch_lightning import LightningModule
 
-class Composition(LightningModule):
+class Composite(LightningModule):
     def __init__(self, **kwargs):
         self.baseline = Baseline(self, **kwargs)
-        self.inheritance = Inheritance  # don't want __init__.
 
     def setup(self, stage=None):
         self.baseline.setup(stage)
@@ -224,7 +227,7 @@ class Composition(LightningModule):
         return self.baseline.test_dataloader()
 
     def configure_optimizers(self):     
-        return self.inheritance.configure_optimizers(self)  # Use configure_optimizers() from Inheritance.
+        return Inheritance.configure_optimizers(self)  # Use configure_optimizers() from Inheritance.
 
     def forward(self, images):
         return self.baseline.forward(images)
@@ -249,12 +252,14 @@ Currently, there are two methods for giving arguments:
 1. **Via command line arguments using the [`argparse` module](https://docs.python.org/3/library/argparse.html)**. `argparse` mainly handles paths, development stage flags (e.g., training and testing flags), and cluster manager arguments.
 2. **Via a configuration file stored in [`YAML` format](https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started)**. Can handle all the arguments defined by the `argparse` plus more, including hyperparameters for the model.
 
-***There are only four mandatory arguments***
+***The mandatory arguments include:***
 1. `task`, the name of the task.
 2. `config`, the name of the configuration (no extension).
 3. `module`, the name of the module that the model definition is housed.
 4. `definition`, the name of the class representing the model.
 5. `exp_dir`, the experiment directory, i.e., where all outputs, including model checkpoints will be saved.
+6. `monitor`, metric to monitor for [ModelCheckpoint](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.ModelCheckpoint.html) and [EarlyStopping](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.EarlyStopping.html?highlight=earlystoppin#earlystopping) (optional), as well as test checkpoint loading (e.g., 'val_loss').
+7. `monitor_mode`, whether the monitored metric is to be maximised or minimised ('max' or 'min').
 
 ***`task` and `config` must be given as command line arguments for `argparse`:***
 
@@ -263,9 +268,6 @@ python3 main.py --config baseline --task cifar10
 ```
 
 ***`module`, `definition`, and `exp_dir` can be given either as command line arguments, or be placed in the configuration file.***
-
-
-
 
 For each model of a task, we define a configuration. Hyperparameters, paths, as well as the device configuration can be stored in a configuration file. Configuration files have the following strict requirements:
 
@@ -276,7 +278,7 @@ For each model of a task, we define a configuration. Hyperparameters, paths, as 
 
 ---
 
-If we have the following configuration file for the aforementioned CIFAR10  `Baseline` model, `task.cifar10.config.baseline.yaml`:
+If we have the following configuration file for the aforementioned CIFAR10  `Baseline` model, `task/cifar10/config/baseline.yaml`:
 
 ```yaml
 train: True
@@ -293,7 +295,7 @@ exp_dir: /my/experiment/directory
 dataset_dir: /my/datasets/directory
 ```
 
-Another way we can improve upon the baseline model, i.e., the baseline configuration, is by modifying its hyperparameters. For example, we can still use `Baseline`, but alter the learning rate in `task.cifar10.config.baseline_rev_a.yaml`:
+Another way we can improve upon the baseline model, i.e., the baseline configuration, is by modifying its hyperparameters. For example, we can still use `Baseline`, but alter the learning rate in `task/cifar10/config/baseline_rev_a.yaml`:
 
 ```yaml
 train: True
@@ -313,6 +315,127 @@ dataset_dir: /my/datasets/directory
 ```shell
 python3 main.py --config baseline_rev_a --task cifar10
 ```
+
+# Next level: Configuration composition via [Hydra](https://hydra.cc/)
+
+---
+
+If your new configuration only modifies a few arguments of another configuration file, you can take advantage of the composition feature of [Hydra](https://hydra.cc/). This makes creating `task/cifar10/config/baseline_rev_a.yaml` from the previous section easy. We simply add the arguments from `task/cifar10/config/baseline.yaml` by adding its name to the `defaults` list:
+
+```yaml
+defaults:
+  - baseline
+  - _self_
+
+lr: 1e-4
+```
+***Note that other configuration files are imported with reference to the current configuration path (not the working directory).***
+
+
+Please note that groups are not being used, and packages should be placed using `@_global_` if the configurations being used for composition are not in the same directory. ***For example, the following would not work with this repository as the arguments in `hpc_paths` will be grouped under `paths`:***
+
+```yaml
+defaults:
+  - paths/hpc_paths
+  - _self_
+
+train: True
+test: True
+resumable: True
+module: baseline
+definition: Baseline
+monitor: 'val_acc'
+monitor_mode: 'max'
+lr: 1e-3
+max_epochs: 3
+mbatch_size: 32
+num_workers: 5
+```
+
+To get around this, simply place `@_global_` to remove the grouping:
+
+```yaml
+defaults:
+  - paths/hpc_paths@_global_  # changed here to remove "paths" grouping.
+  - _self_
+
+train: True
+test: True
+resumable: True
+module: baseline
+definition: Baseline
+monitor: 'val_acc'
+monitor_mode: 'max'
+lr: 1e-3
+max_epochs: 3
+mbatch_size: 32
+num_workers: 5
+```
+
+This also allows us to organise configurations easily. For example, if we have the following directory structure:
+```
+├── task
+│   └──  cifar10          
+│        └── config  
+│            ├── cluster
+│            │    ├── 2hr.yaml
+│            │    └── 24hr.yaml
+│            │
+│            ├── distributed
+│            │    ├── 1gpu.yaml
+│            │    ├── 4gpu.yaml
+│            │    └── 4gpu4node.yaml
+│            │
+│            ├── paths
+│            │    ├── local.yaml
+│            │    └── hpc.yaml
+│            │
+│            └── baseline.yaml
+```
+With `task/cifar10/config/baseline.yaml` as:
+```yaml
+defaults:
+  - cluster/2hr@_global_
+  - distributed/4gpu@_global_
+  - paths/hpc_paths@_global_
+  - _self_
+
+train: True
+test: True
+resumable: True
+module: baseline
+definition: Baseline
+monitor: 'val_acc'
+monitor_mode: 'max'
+lr: 1e-3
+max_epochs: 3
+mbatch_size: 32
+num_workers: 5
+```
+
+Where `task/cifar10/config/baseline.yaml` will now include arguments from the following example sub-configurations:
+
+- `task/cifar10/config/cluster/2hr.yaml`:
+   ```yaml
+   memory: 32GB
+   time_limit: '02:00:00'
+   venv_path: /path/to/my/venv/bin/activate
+   ```
+ - `task/cifar10/config/distributed/4gpu.yaml`:
+   ```yaml
+   num_gpus: 2
+   strategy: ddp
+   ```
+ - `task/cifar10/config/paths/hpc.yaml`:
+   ```yaml
+   exp_dir: /path/to/my/experiments
+   dataset_dir: /path/to/my/dataset
+   ```
+
+See the following documentation for more information:
+ - https://hydra.cc/docs/1.2/tutorials/basic/your_first_app/defaults/
+ - https://hydra.cc/docs/1.2/advanced/defaults_list/#composition-order
+ - https://hydra.cc/docs/1.2/advanced/overriding_packages/
 
 # Stages & `pytorch_lightning.Trainer`
 
@@ -369,11 +492,11 @@ The main function does the following:
 
 The following arguments are used for distributed computing:
 
-| Argument      | Description                                                | Default      |
-|---------------|------------------------------------------------------------|--------------|
-| `num_workers` | No. of workers per DataLoader & GPU                        | `1`          |
-| `num_gpus`    | Number of GPUs per node                                    | `1`          |
-| `num_nodes`   | Number of nodes (should only be used with `submit = True`) | `1`          |
+| Argument      | Description                                                | Default |
+|---------------|------------------------------------------------------------|---------|
+| `num_workers` | No. of workers per DataLoader & GPU                        | `None`  |
+| `num_gpus`    | Number of GPUs per node                                    | `None`  |
+| `num_nodes`   | Number of nodes (should only be used with `submit = True`) | `1`     |
 
 The following arguments are used to configure a job for a cluster manager (the default cluster manager is SLURM):
 
@@ -381,10 +504,10 @@ The following arguments are used to configure a job for a cluster manager (the d
 |--------------|----------------------------------------------------------------|--------------|
 | `memory`     | Amount of memory per node                                      | `'16GB'`     |
 | `time_limit` | Job time limit                                                 | `'02:00:00'` |
-| `submit`     | Submit job to the cluster manager                              | `False`      |
-| `resumable`  | Resumable training; Automatic resubmission to cluster manager  | `False`      |
+| `submit`     | Submit job to the cluster manager                              | `None`       |
+| `resumable`  | Resumable training; Automatic resubmission to cluster manager  | `None`       |
 | `qos`        | Quality of service                                             | `None`       |
-| `begin`      | When to begin the Slurm job, e.g. now+1hour                    | `'now'`      |
+| `begin`      | When to begin the Slurm job, e.g. now+1hour                    | `None`       |
 | `email`      | Email for cluster manager notifications                        | `None`       |
 | `venv_path`  | Path to ''bin/activate'' of a venv.                            | `None`       |
 
@@ -397,9 +520,8 @@ The following arguments are used to configure a job for a cluster manager (the d
 ***Or they can be placed in the configuration `.yaml` file:***
 
 ```yaml
-submit: True  # Added.
 num_gpus: 4  # Added.
-num-workers: 5  # Added.
+num_workers: 5  # Added.
 memory: '32GB'  # Added.
 
 train: True
@@ -417,8 +539,56 @@ dataset_dir: /my/datasets/directory
 ```
 And executed with:
 ```shell
- python3 main.py --config baseline --task cifar10
+ python3 main.py --config baseline --task cifar10 --submit True
  ```
+
+# Installing required packages in a `venv`
+
+Set the following variables:
+```shell
+ENV_NAME = /my/env/name
+REQ_PATH = /my/repositories/path/dl_hpc_starter_pack/requirements.txt
+```
+Note:
+ - `ENV_NAME` can be of your choosing. 
+ - `REQ_PATH` is the path of the `requirements.txt` in this repository.
+
+Then run the following with the `python` version of your choosing (most HPCs have `python` available as a module package: `module load python`):
+```
+python3 -m venv --system-site-packages $ENV_NAME
+source $ENV_NAME/bin/activate
+pip install --upgrade pip
+pip install --upgrade -r $REQ_PATH --no-cache-dir
+```
+
+If using a cluster manager, add the path to the `bin/activate` of the venv:
+```yaml
+...
+venv_path: /my/env/name/bin/activate
+...
+```
+
+# Monitoring using [Neptune.ai](https://neptune.ai/)
+
+Simply sign up at https://neptune.ai/ and add your username and API token to your configuration file:
+
+```yaml
+...
+neptune_username: my_username
+neptune_api_key: df987y94y2q9hoiusadhc9wy9tr82uq408rjw98ch987qwhtr093q4jfi9uwehc987wqhc9qw4uf9w3q4h897324th
+...
+```
+The [PyTorch Lightning Trainer](https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html) will then automatically upload metrics using the [Neptune Logger](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.neptune.html) to [Neptune.ai](https://neptune.ai/). Once logged in to https://neptune.ai/, you will be able to monitor your task. See here for information about using the online UI: https://docs.neptune.ai/you-should-know/displaying-metadata.
+
+# Where are all my outputs? In `exp_dir`.
+
+---
+
+The experiments directory is where all your outputs will be saved.
+
+Note: the trial number also sets the seed number for your experiment.
+
+***Description to be finished.
 
 
 # Repository Wish List

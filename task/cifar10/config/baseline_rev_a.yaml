@@ -1,0 +1,5 @@
+defaults:
+  - baseline
+  - _self_
+
+lr: 1e-4

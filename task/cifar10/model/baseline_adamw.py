@@ -2,10 +2,9 @@ from pytorch_lightning import LightningModule
 from task.cifar10.model.baseline import Baseline
 from task.cifar10.model.resnet18 import ResNet18
 
-class Composition(LightningModule):
+class Composite(LightningModule):
     def __init__(self, **kwargs):
         self.baseline = Baseline(self, **kwargs)
-        self.resnet18 = ResNet18  # don't want __init__.
 
     def setup(self, stage=None):
         self.baseline.setup(stage)
@@ -20,7 +19,7 @@ class Composition(LightningModule):
         return self.baseline.test_dataloader()
 
     def configure_optimizers(self):     
-        return self.resnet18.configure_optimizers(self)  # Use configure_optimizers() from ResNet18.
+        return ResNet18.configure_optimizers(self)  # Use configure_optimizers() from ResNet18.
 
     def forward(self, images):
         return self.baseline.forward(images)

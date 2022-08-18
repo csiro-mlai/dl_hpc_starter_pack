@@ -27,7 +27,7 @@ def trainer_instance(
     patience: int = 0,
     min_delta: float = 0.0,
     divergence_threshold: Optional[float] = None,
-    exp_dir: Optional[str] = None,
+    exp_dir_trial: Optional[str] = None,
     resumable: bool = True,
     resume_epoch: Optional[int] = None,
     resume_ckpt_path: Optional[str] = None,
@@ -72,7 +72,7 @@ def trainer_instance(
         min_delta - minimum change in the monitored quantity to qualify as an
             improvement.
         divergence_threshold - stop training as soon as the monitored quantity becomes worse than this threshold.
-        exp_dir - directory where the files for the experiment are saved.
+        exp_dir_trial - experiment directory for the trial. All outputs are saved to this path.
         resumable - whether the last completed epoch is saved to enable resumable training.
         resume_epoch - the epoch to resume training from.
         resume_ckpt_path - resume training from the specified checkpoint.
@@ -108,8 +108,8 @@ def trainer_instance(
         plugins.append(SLURMEnvironment(auto_requeue=False))
 
     # Loggers
-    loggers.append(CSVLogger(exp_dir, name='', version=''))
-    loggers.append(TensorBoardLogger(exp_dir, name='', version='', default_hp_metric=False))
+    loggers.append(CSVLogger(exp_dir_trial, name='', version=''))
+    loggers.append(TensorBoardLogger(exp_dir_trial, name='', version='', default_hp_metric=False))
     if neptune_api_key is not None:
         custom_run_id = f'{config[:16]}_trial_{trial}'
         assert len(custom_run_id) <= 32, '"custom_run_id" must be less than or equal to 32 characters'
@@ -138,7 +138,7 @@ def trainer_instance(
     if every_n_epochs:
         callbacks.append(
             ModelCheckpoint(
-                dirpath=exp_dir,
+                dirpath=exp_dir_trial,
                 monitor=monitor,
                 mode=monitor_mode,
                 save_top_k=save_top_k,
@@ -156,7 +156,7 @@ def trainer_instance(
                              '/fault_tolerant_training_expert.html#enable-fault-tolerant-behavior-on-your-own-cluster')
         callbacks.append(
             ModelCheckpoint(
-                dirpath=exp_dir,
+                dirpath=exp_dir_trial,
                 monitor=monitor,
                 mode=monitor_mode,
                 save_top_k=save_top_k,
@@ -193,7 +193,7 @@ def trainer_instance(
         accumulate_grad_batches = int(accumulate_grad_batches)
 
     # Resume from checkpoint
-    ckpt_path = resume_from_ckpt_path(exp_dir, resumable, resume_epoch, resume_ckpt_path)
+    ckpt_path = resume_from_ckpt_path(exp_dir_trial, resumable, resume_epoch, resume_ckpt_path)
 
     # Remove keyword arguments not associated with pytorch_lightning.Trainer.
     # Parameters associated with pytorch_lightning.Trainer:

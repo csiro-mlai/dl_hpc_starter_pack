@@ -1,0 +1,3 @@
+memory: 32GB
+time_limit: '02:00:00'
+venv_path: /scratch2/nic261/environments/dl_hpc_starter_pack/bin/activate

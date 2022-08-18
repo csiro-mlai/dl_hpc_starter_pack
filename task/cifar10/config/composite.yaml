@@ -1,0 +1,6 @@
+defaults:
+  - baseline
+  - _self_
+
+module: baseline_adamw
+definition: Composite

@@ -16,7 +16,7 @@ class ClusterSubmit(object):
             self,
             fnc: Callable,
             fnc_kwargs: Namespace,
-            exp_dir: str,
+            save_dir: str,
             log_err: bool = True,
             log_out: bool = True,
             manager: str = 'slurm',
@@ -34,7 +34,7 @@ class ClusterSubmit(object):
         Argument/s:
             fnc - function for the job.
             fnc_kwargs - keyword arguments for the function.
-            exp_dir - experiment directory where outputs are saved.
+            save_dir -  directory where the cluster manager script, stdout, and stderr are saved.
             log_err - log standard error.
             log_out - log standard output.
             manager - 'slurm' (needs to be modified for other cluster managers, e.g., PBS).
@@ -50,7 +50,7 @@ class ClusterSubmit(object):
         """
         self.fnc = fnc
         self.fnc_kwargs = fnc_kwargs
-        self.exp_dir = exp_dir
+        self.exp_dir = save_dir
         self.log_err = log_err
         self.log_out = log_out
         self.manager = manager
@@ -86,11 +86,8 @@ class ClusterSubmit(object):
         self.notify_on_fail = on_fail
 
     def submit(self, job_display_name=None):
-
         self.job_display_name = job_display_name
-
         self.log_dir()
-
         if self.is_from_manager_object:
             self.run()
         else:
@@ -104,13 +101,11 @@ class ClusterSubmit(object):
             signal.signal(signal.SIGTERM, self.term_handler)
         else:
             print("Automatic requeuing has not been set. The job will not be requeued after timeout.")
-
         try:
             self.fnc(self.fnc_kwargs)
 
         except Exception as e:
             print('Caught exception in worker thread', e)
-
             traceback.print_exc()
             raise SystemExit
 
@@ -118,14 +113,12 @@ class ClusterSubmit(object):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         timestamp = 'session_{}_{}'.format(session, timestamp)
 
-        # Generate command
+        # Generate and save cluster manager script
         manager_cmd_script_path = os.path.join(self.manager_files_log_path, '{}.sh'.format(timestamp))
-
         if self.manager == 'slurm':
             manager_cmd = self.build_slurm_command(manager_cmd_script_path, timestamp, session)
         else:
             raise ValueError(f'{self.manager} is not a valid manager.')
-
         self.save_manager_cmd(manager_cmd, manager_cmd_script_path)
 
         # Run script to launch job
@@ -137,17 +130,14 @@ class ClusterSubmit(object):
             print('Launch failed...')
 
     def call_resume(self):
-
         job_id = os.environ['SLURM_JOB_ID']
         cmd = 'scontrol requeue {}'.format(job_id)
-
         print(f'\nRequeing job {job_id}...')
         result = call(cmd, shell=True)
         if result == 0:
             print(f'Requeued job {job_id}.')
         else:
             print('Requeue failed...')
-
         os._exit(0)
 
     def sig_handler(self, signum, frame):
@@ -172,24 +162,18 @@ class ClusterSubmit(object):
             return 0
 
     def log_dir(self):
-
         out_path = os.path.join(self.exp_dir)
         self.exp_dir = out_path
-
         if not os.path.exists(out_path):
             os.makedirs(out_path)
-
         self.manager_files_log_path = os.path.join(out_path, 'manager_scripts')
-
         if not os.path.exists(self.manager_files_log_path):
             os.makedirs(self.manager_files_log_path)
-
         if self.log_err:
             err_path = os.path.join(out_path, 'error_logs')
             if not os.path.exists(err_path):
                 os.makedirs(err_path)
             self.err_log_path = err_path
-
         if self.log_out:
             out_path = os.path.join(out_path, 'out_logs')
             if not os.path.exists(out_path):
@@ -213,7 +197,7 @@ class ClusterSubmit(object):
         if self.begin != "now":
             sub_commands.append('#SBATCH --begin={}'.format(self.begin))
 
-        if self.num_gpus > 0:
+        if self.num_gpus:
             sub_commands.append('#SBATCH --gres=gpu:{}'.format(self.num_gpus))
 
         if self.num_workers > 0:
@@ -228,7 +212,7 @@ class ClusterSubmit(object):
             mail_type.append('END')
         if self.notify_on_fail:
             mail_type.append('FAIL')
-        if len(mail_type) > 0:
+        if len(mail_type) > 0 and self.email is not None:
             sub_commands.append('#SBATCH --mail-type={}'.format(','.join(mail_type)))
             sub_commands.append('#SBATCH --mail-user={}'.format(self.email))
 

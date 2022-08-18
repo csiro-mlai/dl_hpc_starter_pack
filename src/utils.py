@@ -1,4 +1,5 @@
 from argparse import Namespace
+from hydra import compose, initialize_config_dir
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 import glob
@@ -8,7 +9,6 @@ import numpy as np
 import os
 import re
 import warnings
-import ruamel.yaml as yaml
 
 
 def importer(
@@ -48,7 +48,7 @@ def importer(
     return getattr(module, definition)
 
 
-def load_config_and_update_args(args: Namespace, print_args: bool = False):
+def load_config_and_update_args(args: Namespace, print_args: bool = False) -> None:
     """
     Loads the configuration .yaml file and updates the args object.
 
@@ -60,45 +60,64 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False):
     if not args.work_dir:
         args.work_dir = os.getcwd()
 
+    # Configuration name
     if args.config.endswith('.yaml'):
         args.config_file_name = args.config
         args.config = args.config.replace('.yaml', '')
     else:
         args.config_file_name = args.config + '.yaml'
 
-    args.config_full_path = os.path.join(args.work_dir, 'task', args.task, 'config', args.config_file_name)
+    # Load configuration using Hydra's Compose API
+    args.config_dir = os.path.join(args.work_dir, 'task', args.task, 'config')
+    with initialize_config_dir(
+            version_base=None, config_dir=args.config_dir, job_name=f'{args.config}'
+    ):
+        config = compose(config_name=args.config)
 
-    with open(args.config_full_path) as f:
-        config = yaml.load(f, Loader=yaml.Loader)
-    args.__dict__.update(config)
-
-    # Add the task, configuration name, and the trial number to the experiment directory.
-    # args.exp_dir = os.path.join(args.exp_dir, args.task, args.config, f'{args.trial}')
-    args.exp_dir = os.path.join(args.exp_dir, args.task, args.config, 'trial_' + f'{args.trial}')
-    Path(args.exp_dir).mkdir(parents=True, exist_ok=True)
-
-    if print_args:
-        print(f'args: {args.__dict__}')
+    # Update args with config and check for conflicts
+    args.config_full_path = os.path.join(args.config_dir, args.config_file_name)
+    for k, v in config.items():
+        if k not in args.__dict__:
+            args.__dict__[k] = v
+        elif k in args.__dict__:
+            if args.__dict__[k] is None:
+                args.__dict__[k] = v
+            else:
+                if args.__dict__[k] != v:
+                    raise ValueError(f'There is a conflict between command line argument "--{k} {args.__dict__[k]}" '
+                                     f'({type(args.__dict__[k])}) and configuration argument "{k}: {v}" from '
+                                     f'{args.config_full_path} ({type(v)}).')
 
     # The model name must be defined in the configuration or in the command line arguments
     assert args.module, f'"module" must be specified as a command line argument or in {args.config_full_path}.'
     assert args.definition, f'"definition" must be specified as a command line argument or in {args.config_full_path}.'
     assert args.exp_dir, f'"exp_dir" must be specified as a command line argument or in {args.config_full_path}.'
 
+    # There is probably a better place to do this
+    args.num_workers = args.num_workers if args.num_workers is not None else 1
 
-def get_epoch_ckpt_path(exp_dir: str, load_epoch: int) -> str:
+    # Add the task, configuration name, and the trial number to the experiment directory
+    args.trial = args.trial if args.trial is not None else 0
+    args.exp_dir_trial = os.path.join(args.exp_dir, args.task, args.config, 'trial_' + f'{args.trial}')
+    Path(args.exp_dir_trial).mkdir(parents=True, exist_ok=True)
+
+    if print_args:
+        print(f'args: {args.__dict__}')
+
+
+def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int) -> str:
     """
     Get the checkpoint path based on the epoch number.
 
     Argument/s:
-        exp_dir - dictionary containing the configuration.
+        exp_dir_trial - Experiment directory for the trial (where the checkpoints are saved).
         load_epoch - epoch to load.
 
     Returns:
         Path to the epoch's checkpoint.
     """
     try:
-        ckpt_path = glob.glob(os.path.join(exp_dir, "*epoch=" + str(load_epoch) + "*.ckpt"))
+        ckpt_path = glob.glob(os.path.join(exp_dir_trial, "*epoch=" + str(load_epoch) + "*.ckpt"))
         assert len(ckpt_path) == 1, f'Multiple checkpoints for epoch {load_epoch}: {ckpt_path}.'
     except:
         raise ValueError(
@@ -107,19 +126,19 @@ def get_epoch_ckpt_path(exp_dir: str, load_epoch: int) -> str:
     return ckpt_path[0]
 
 
-def get_best_ckpt_path(exp_dir: str, monitor_mode: str) -> str:
+def get_best_ckpt_path(exp_dir_trial: str, monitor_mode: str) -> str:
     """
     Get the best performing checkpoint from the experiment directory.
 
     Argument/s:
-        exp_dir - Experiment directory (where the checkpoints are saved).
+        exp_dir_trial - Experiment directory for the trial (where the checkpoints are saved).
         monitor_mode - Metric monitoring mode, either "min" or "max".
 
     Returns:
         Path to the epoch's checkpoint.
     """
 
-    ckpt_list = glob.glob(os.path.join(exp_dir, '*=*=*.ckpt'))
+    ckpt_list = glob.glob(os.path.join(exp_dir_trial, '*=*=*.ckpt'))
 
     if not ckpt_list:
         raise ValueError('No checkpoints exist in the checkpoint directory.')
@@ -138,13 +157,13 @@ def get_best_ckpt_path(exp_dir: str, monitor_mode: str) -> str:
 
 
 def get_test_ckpt_path(
-        exp_dir: str, monitor_mode: str, test_epoch: Optional[int] = None, test_ckpt_path: Optional[str] = None,
+        exp_dir_trial: str, monitor_mode: str, test_epoch: Optional[int] = None, test_ckpt_path: Optional[str] = None,
 ) -> str:
     """
     Get the test checkpoint.
 
     Argument/s:
-        exp_dir - Experiment directory (where the checkpoints are saved).
+        exp_dir_trial - Experiment directory for the trial (where the checkpoints are saved).
         monitor_mode - Metric motitoring mode, either "min" or "max".
         test_epoch - epoch to test.
         test_ckpt_path - path to checkpoint to be tested.
@@ -160,28 +179,28 @@ def get_test_ckpt_path(
         assert os.path.isfile(test_ckpt_path), f'File does not exist: {test_ckpt_path}.'
         ckpt_path = test_ckpt_path
     elif test_epoch is not None:
-        ckpt_path = get_epoch_ckpt_path(exp_dir, load_epoch=test_epoch)
+        ckpt_path = get_epoch_ckpt_path(exp_dir_trial, load_epoch=test_epoch)
     else:
-        ckpt_path = get_best_ckpt_path(exp_dir, monitor_mode)
+        ckpt_path = get_best_ckpt_path(exp_dir_trial, monitor_mode)
 
     return ckpt_path
 
 
-def write_test_ckpt_path(ckpt_path: str, exp_dir: str):
+def write_test_ckpt_path(ckpt_path: str, exp_dir_trial: str):
     """
     Write ckpt_path used for testing to a text file.
 
     Argument/s:
         ckpt_path - path to the checkpoint of the epoch that scored
             highest for the given validation metric.
-        exp_dir - path to the experiment directory.
+        exp_dir_trial - Experiment directory for the trial.
     """
-    with open(os.path.join(exp_dir, 'test_ckpt_path.txt'), 'a') as f:
+    with open(os.path.join(exp_dir_trial, 'test_ckpt_path.txt'), 'a') as f:
         f.write(ckpt_path + "\n")
 
 
 def resume_from_ckpt_path(
-        exp_dir: str,
+        exp_dir_trial: str,
         resumable: bool = False,
         resume_epoch: int = None,
         resume_ckpt_path: str = None,
@@ -190,7 +209,7 @@ def resume_from_ckpt_path(
     Resume training from the specified checkpoint.
 
     Argument/s:
-        exp_dir - path to the experiment directory.
+        exp_dir_trial - Experiment directory for the trial (where the checkpoints are saved).
         resumable - if training is automatically resumable (i.e., provide last.ckpt as the path).
         resume_epoch - get the path of the checkpoint for a given epoch.
         resume_ckpt_path - outright provide the checkpoint path.
@@ -208,12 +227,12 @@ def resume_from_ckpt_path(
         f'A maximum of one of these options can be set: {options}. The following are set: {set_options}.'
 
     if resumable:
-        if os.path.isfile(os.path.join(exp_dir, 'last.ckpt')):
-            ckpt_path = os.path.join(exp_dir, 'last.ckpt')
+        if os.path.isfile(os.path.join(exp_dir_trial, 'last.ckpt')):
+            ckpt_path = os.path.join(exp_dir_trial, 'last.ckpt')
         else:
             warnings.warn('last.ckpt does not exist, starting training from epoch 0.')
     elif resume_epoch is not None:
-        ckpt_path = get_epoch_ckpt_path(exp_dir, load_epoch=resume_epoch)
+        ckpt_path = get_epoch_ckpt_path(exp_dir_trial, load_epoch=resume_epoch)
     elif resume_ckpt_path:
         ckpt_path = resume_ckpt_path
 

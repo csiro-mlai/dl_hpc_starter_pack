@@ -1,13 +1,18 @@
-train: True
-test: True
+defaults:
+  - paths/hpc_paths@_global_
+  - cluster/2hr@_global_
+  - distributed/2gpu@_global_
+  - _self_
+
 module: baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
+
+train: True
+test: True
+resumable: True
+
 lr: 1e-3
 max_epochs: 3
 mbatch_size: 32
-num_workers: 5
-exp_dir: /datasets/work/hb-imageclef/work/experiments
-dataset_dir: /datasets/work/hb-mlaifsp-mm/source/Datasets
-venv_path: /scratch2/nic261/environments/simplified_12_08_22/bin/activate
