@@ -27,11 +27,11 @@
 - [Innovate via Configuration Files](#innovate-via-configuration-files)
 - [Optional: Configuration composition via Hydra](#optional-configuration-composition-via-hydra)
 - [Stages and Trainer](#stages-and-trainer)
-- [Tying it all together: main.py](#tying-it-all-together-mainpy)
+- [Tying it all together: `main.py`](#tying-it-all-together-mainpy)
 - [Cluster manager and distributed computing](#cluster-manager-and-distributed-computing)
 - [Installing required packages in a `venv`](#installing-required-packages-in-a-venv)
 - [Monitoring using Neptune.ai](#monitoring-using-neptuneai)
-- [Where all the outputs go: exp_dir](#where-all-the-outputs-go-exp_dir)
+- [Where all the outputs go: `exp_dir`](#where-all-the-outputs-go-exp_dir)
 - [Repository Wish List](#repository-wish-list)
 
 # Repository map
