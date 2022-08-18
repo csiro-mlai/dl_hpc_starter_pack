@@ -22,16 +22,16 @@
 - [Repository map](#repository-map)
 - [Tasks](#tasks)
 - [Models](#models)
-- [Innovate via Model Composition & Inheritance](#innovate-via-model-composition---inheritance)
-- [Configuration `.yaml` files and `argparse`](#configuration--yaml--files-and--argparse-)
+- [Innovate via Model Composition and Inheritance](#innovate-via-model-composition-and-inheritance)
+- [Configuration YAML files and argparse](#configuration-yaml-files-and-argparse)
 - [Innovate via Configuration Files](#innovate-via-configuration-files)
-- [Next level: Configuration composition via Hydra](#next-level--configuration-composition-via--hydra--https---hydracc--)
-- [Stages & `pytorch_lightning.Trainer`](#stages----pytorch-lightningtrainer-)
-- [Tying it all together: `main.py`](#tying-it-all-together---mainpy-)
-- [Cluster manager arguments & distributed computing](#cluster-manager-arguments---distributed-computing)
-- [Installing required packages in a `venv`](#installing-required-packages-in-a--venv-)
-- [Monitoring using Neptune.ai](#monitoring-using--neptuneai--https---neptuneai--)
-- [Where are all my outputs? In `exp_dir`.](#where-are-all-my-outputs--in--exp-dir-)
+- [Optional: Configuration composition via Hydra](#optional-configuration-composition-via-hydra)
+- [Stages and Trainer](#stages-and-trainer)
+- [Tying it all together: main.py](#tying-it-all-together-mainpy)
+- [Cluster manager and distributed computing](#cluster-manager-and-distributed-computing)
+- [Installing required packages in a `venv`](#installing-required-packages-in-a-venv)
+- [Monitoring using Neptune.ai](#monitoring-using-neptuneai)
+- [Where all the outputs go: exp_dir](#where-all-the-outputs-go-exp_dir)
 - [Repository Wish List](#repository-wish-list)
 
 # Repository map
@@ -118,7 +118,7 @@ Once we have created our task directory (e.g., `task/cifar10`), we now want to c
 
  - An example model for `cifar10` is in [task/cifar10/model/baseline.py](https://github.com/csiro-mlai/dl_hpc_starter_pack/blob/main/task/cifar10/model/baseline.py). 
 
-# Innovate via Model Composition & Inheritance
+# Innovate via Model Composition and Inheritance
 
 ---
 To promote rapid innovation of models, we recommend using class composition and/or inheritance. ***For example, we may have a baseline that not only includes a basic model, but also the data pipeline:***
@@ -246,7 +246,7 @@ class Composite(LightningModule):
         return self.baseline.test_step(batch, batch_idx)
 ```
 
-# Configuration `.yaml` files and `argparse`
+# Configuration YAML files and argparse
 
 ---
 
@@ -320,7 +320,7 @@ dataset_dir: /my/datasets/directory
 python3 main.py --config baseline_rev_a --task cifar10
 ```
 
-# Next level: Configuration composition via [Hydra](https://hydra.cc/)
+# Optional: Configuration composition via Hydra
 
 ---
 
@@ -441,7 +441,7 @@ See the following documentation for more information:
  - https://hydra.cc/docs/1.2/advanced/defaults_list/#composition-order
  - https://hydra.cc/docs/1.2/advanced/overriding_packages/
 
-# Stages & `pytorch_lightning.Trainer`
+# Stages and Trainer
 
 ---
 
@@ -490,7 +490,7 @@ The main function does the following:
  - Reads the configuration `.yaml` and combines it with the command line arguments.
  - Submits `stages` to the cluster manager if `args.submit = True` or runs `stages` locally. The command line arguments and the configuration arguments are passed to `stages` in both cases.
 
-# Cluster manager arguments & distributed computing
+# Cluster manager and distributed computing
 
 ---
 
@@ -572,7 +572,7 @@ venv_path: /my/env/name/bin/activate
 ...
 ```
 
-# Monitoring using [Neptune.ai](https://neptune.ai/)
+# Monitoring using Neptune.ai
 
 Simply sign up at https://neptune.ai/ and add your username and API token to your configuration file:
 
@@ -584,11 +584,11 @@ neptune_api_key: df987y94y2q9hoiusadhc9wy9tr82uq408rjw98ch987qwhtr093q4jfi9uwehc
 ```
 The [PyTorch Lightning Trainer](https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html) will then automatically upload metrics using the [Neptune Logger](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.neptune.html) to [Neptune.ai](https://neptune.ai/). Once logged in to https://neptune.ai/, you will be able to monitor your task. See here for information about using the online UI: https://docs.neptune.ai/you-should-know/displaying-metadata.
 
-# Where are all my outputs? In `exp_dir`.
+# Where all the outputs go: `exp_dir`
 
 ---
 
-The experiments directory is where all your outputs will be saved.
+The experiments directory is where all your outputs will be saved, including model checkpoints, metric scores. This is also where the cluster manager script, as well as where stderr and stdout are saved.
 
 Note: the trial number also sets the seed number for your experiment.
 
