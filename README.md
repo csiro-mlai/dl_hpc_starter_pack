@@ -25,9 +25,13 @@
 - [Innovate via Model Composition & Inheritance](#innovate-via-model-composition---inheritance)
 - [Configuration `.yaml` files and `argparse`](#configuration--yaml--files-and--argparse-)
 - [Innovate via Configuration Files](#innovate-via-configuration-files)
+- [Next level: Configuration composition via Hydra](#next-level--configuration-composition-via--hydra--https---hydracc--)
 - [Stages & `pytorch_lightning.Trainer`](#stages----pytorch-lightningtrainer-)
 - [Tying it all together: `main.py`](#tying-it-all-together---mainpy-)
 - [Cluster manager arguments & distributed computing](#cluster-manager-arguments---distributed-computing)
+- [Installing required packages in a `venv`](#installing-required-packages-in-a--venv-)
+- [Monitoring using Neptune.ai](#monitoring-using--neptuneai--https---neptuneai--)
+- [Where are all my outputs? In `exp_dir`.](#where-are-all-my-outputs--in--exp-dir-)
 - [Repository Wish List](#repository-wish-list)
 
 # Repository map
