@@ -25,7 +25,7 @@
 - [Innovate via Model Composition and Inheritance](#innovate-via-model-composition-and-inheritance)
 - [Configuration YAML files and argparse](#configuration-yaml-files-and-argparse)
 - [Innovate via Configuration Files](#innovate-via-configuration-files)
-- [Optional: Configuration composition via Hydra](#optional-configuration-composition-via-hydra)
+- [Next level: Configuration composition via Hydra](#next-level-configuration-composition-via-hydra)
 - [Stages and Trainer](#stages-and-trainer)
 - [Tying it all together: `main.py`](#tying-it-all-together-mainpy)
 - [Cluster manager and distributed computing](#cluster-manager-and-distributed-computing)
@@ -320,7 +320,7 @@ dataset_dir: /my/datasets/directory
 python3 main.py --config baseline_rev_a --task cifar10
 ```
 
-# Optional: Configuration composition via Hydra
+# Next level: Configuration composition via Hydra
 
 ---
 

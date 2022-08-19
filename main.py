@@ -67,12 +67,6 @@ def submit(stages_fnc: Callable, args: Namespace):
 
     else:
 
-        # Defaults
-        args.time_limit = args.time_limit if args.time_limit is not None else '02:00:00'
-        args.num_nodes = args.num_nodes if args.num_nodes is not None else 1
-        args.num_workers = args.num_workers if args.num_workers is not None else 1
-        args.memory = args.memory if args.memory is not None else '16GB'
-
         # Cluster object
         cluster = ClusterSubmit(
             fnc_kwargs=args,

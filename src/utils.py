@@ -93,8 +93,12 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
     assert args.definition, f'"definition" must be specified as a command line argument or in {args.config_full_path}.'
     assert args.exp_dir, f'"exp_dir" must be specified as a command line argument or in {args.config_full_path}.'
 
-    # There is probably a better place to do this
+    # Defaults: There is probably a better place to do this
     args.num_workers = args.num_workers if args.num_workers is not None else 1
+    args.num_nodes = args.num_nodes if args.num_nodes is not None else 1
+    if args.submit:
+        args.time_limit = args.time_limit if args.time_limit is not None else '02:00:00'
+        args.memory = args.memory if args.memory is not None else '16GB'
 
     # Add the task, configuration name, and the trial number to the experiment directory
     args.trial = args.trial if args.trial is not None else 0
