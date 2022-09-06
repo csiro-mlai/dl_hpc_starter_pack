@@ -1,7 +1,7 @@
 from argparse import Namespace
 from pytorch_lightning.utilities.seed import seed_everything
-from src.dlhpcstarter.tools.ext import main as collect_env_details
-from src.dlhpcstarter.trainer import trainer_instance
+from dlhpcstarter.tools.ext import main as collect_env_details
+from dlhpcstarter.trainer import trainer_instance
 from src import get_test_ckpt_path, importer, load_config_and_update_args, write_test_ckpt_path
 
 
