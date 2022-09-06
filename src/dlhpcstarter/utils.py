@@ -77,16 +77,13 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
     # Update args with config and check for conflicts
     args.config_full_path = os.path.join(args.config_dir, args.config_file_name)
     for k, v in config.items():
-        if k not in args.__dict__:
-            args.__dict__[k] = v
-        elif k in args.__dict__:
-            if args.__dict__[k] is None:
-                args.__dict__[k] = v
-            else:
-                if args.__dict__[k] != v:
-                    raise ValueError(f'There is a conflict between command line argument "--{k} {args.__dict__[k]}" '
-                                     f'({type(args.__dict__[k])}) and configuration argument "{k}: {v}" from '
-                                     f'{args.config_full_path} ({type(v)}).')
+        if getattr(args, k, None) is None:
+            setattr(args, k, v)
+        else:
+            if getattr(args, k) != v:
+                raise ValueError(f'There is a conflict between command line argument "--{k} {getattr(args, k)}" '
+                                    f'({type(getattr(args, k))}) and configuration argument "{k}: {v}" from '
+                                    f'{args.config_full_path} ({type(v)}).')
 
     # The model name must be defined in the configuration or in the command line arguments
     assert args.module, f'"module" must be specified as a command line argument or in {args.config_full_path}.'
