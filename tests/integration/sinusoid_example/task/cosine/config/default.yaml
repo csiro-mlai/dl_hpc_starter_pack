@@ -1,0 +1,18 @@
+defaults:
+  - _self_
+
+module: mlp
+definition: MLP
+monitor: 'val_loss'
+monitor_mode: 'min'
+
+exp_dir: 'tmp'
+
+train: True
+test: True
+resumable: True
+
+lr: 1e-3
+max_epochs: 2
+mbatch_size: 32
+
