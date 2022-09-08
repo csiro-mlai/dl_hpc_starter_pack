@@ -7,8 +7,8 @@ from pytorch_lightning.callbacks import (
 from pytorch_lightning.loggers import NeptuneLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from pytorch_lightning.plugins.environments import SLURMEnvironment
-from src.dlhpcstarter.tools.mods.logger import CSVLogger
-from src.dlhpcstarter.utils import resume_from_ckpt_path
+from dlhpcstarter.tools.mods.logger import CSVLogger
+from dlhpcstarter.utils import resume_from_ckpt_path
 from typing import Optional
 import inspect
 import logging

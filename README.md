@@ -1,4 +1,4 @@
-![](/src/dlhpcstarter/image.png)
+![](/assets/image.png)
 
 ***Aims of this library:***
 
