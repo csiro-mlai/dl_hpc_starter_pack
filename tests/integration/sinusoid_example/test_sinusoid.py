@@ -1,7 +1,7 @@
 from argparse import Namespace
 import os
 from pytest import fixture
-from dlhpcstarter.main import submit
+from dlhpcstarter.__main__ import submit
 from dlhpcstarter.utils import importer, load_config_and_update_args
 
 test_dir = os.path.dirname(__file__)
