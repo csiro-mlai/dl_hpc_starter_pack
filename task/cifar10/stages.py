@@ -1,3 +1,4 @@
+import os
 from argparse import Namespace
 from pytorch_lightning.utilities.seed import seed_everything
 from dlhpcstarter.tools.ext.collect_env_details import main as collect_env_details

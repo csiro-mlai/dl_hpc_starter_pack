@@ -1,0 +1,6 @@
+defaults:
+  - baseline_local
+  - _self_
+
+module: resnet18
+definition: ResNet18

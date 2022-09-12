@@ -1,3 +1,4 @@
+import os
 from argparse import Namespace
 from dlhpcstarter.command_line_arguments import read_command_line_arguments
 from dlhpcstarter.utils import importer, gpu_usage_and_visibility, load_config_and_update_args
@@ -77,6 +78,8 @@ def submit(stages_fnc: Callable, args: Namespace):
             num_nodes=args.num_nodes,
             num_workers=args.num_workers,
             memory=args.memory,
+            python_cmd='',
+            entrypoint='dlhpcstarter',
         )
 
         # Cluster commands
@@ -84,6 +87,9 @@ def submit(stages_fnc: Callable, args: Namespace):
 
         # Source virtual environment
         cluster.add_command('source ' + args.venv_path)
+
+        # NCCL debug flag
+        cluster.add_command('export NCCL_DEBUG=INFO')
 
         # Request the quality of service for the job
         if args.qos:

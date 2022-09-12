@@ -1,0 +1,4 @@
+defaults:
+  - baseline
+  - paths/local_paths@_global_
+  - _self_

@@ -1,6 +1,6 @@
 from argparse import Namespace
 from subprocess import call
-from typing import Callable
+from typing import Callable, Optional
 import datetime
 import os
 import signal
@@ -28,6 +28,7 @@ class ClusterSubmit(object):
             memory: str = '16GB',
             no_srun: bool = False,
             python_cmd: str = 'python3',
+            entrypoint: Optional[str] = None,
             resubmit: bool = True,
     ):
         """
@@ -46,6 +47,7 @@ class ClusterSubmit(object):
             memory - minimum memory amount.
             no_srun - don't use 'srun'.
             python_cmd - python command name.
+            entrypoint - entrypoint to use instead of a script.
             resubmit - automatically resubmit job just before timout.
         """
         self.fnc = fnc
@@ -62,6 +64,7 @@ class ClusterSubmit(object):
         self.memory = memory
         self.no_srun = no_srun
         self.python_cmd = python_cmd
+        self.entrypoint = entrypoint
         self.resubmit = resubmit
 
         self.script_name = os.path.realpath(sys.argv[0])
@@ -230,10 +233,12 @@ class ClusterSubmit(object):
         args_string = self.args_to_string(self.fnc_kwargs)
         args_string = '{} --{} {}'.format(args_string, "slurm_cmd_path", manager_cmd_script_path)
 
-        if self.no_srun:
-            cmd = '{} {} {}'.format(self.python_cmd, self.script_name, args_string)
+        if self.entrypoint:
+            cmd = f'{self.entrypoint} {args_string}'
         else:
-            cmd = 'srun {} {} {}'.format(self.python_cmd, self.script_name, args_string)
+            cmd = '{} {} {}'.format(self.python_cmd, self.script_name, args_string)
+        if not self.no_srun:
+            cmd = 'srun ' + cmd
         sub_commands.append(cmd)
 
         return '\n'.join(sub_commands)

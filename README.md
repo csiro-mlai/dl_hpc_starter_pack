@@ -16,10 +16,17 @@
  - [Neptune.ai](https://neptune.ai/) is used to track experiments; metric scores are automatically uploaded to [Neptune.ai](https://neptune.ai/), allowing you to easily track your experiments from your browser.
  - Scripts for submission to a cluster manager, such as [SLURM](https://slurm.schedmd.com/documentation.html) are written for you. Also, cluster manager jobs are automatically resubmitted and resumed if they haven't finished before the time-limit.
 
+# Installation
+
+The Deep Learning and HPC starter pack is available on PyPI:
+```shell
+pip install dlhpcstarter
+```
 
 # Table of Contents
 
-- [Repository map](#repository-map)
+- [How to structure your project](#how-to-structure-your-project)
+- [Package map](#package-map)
 - [Tasks](#tasks)
 - [Models](#models)
 - [Innovate via Model Composition and Inheritance](#innovate-via-model-composition-and-inheritance)
@@ -29,51 +36,44 @@
 - [Stages and Trainer](#stages-and-trainer)
 - [Tying it all together: `main.py`](#tying-it-all-together-mainpy)
 - [Cluster manager and distributed computing](#cluster-manager-and-distributed-computing)
-- [Installing required packages in a `venv`](#installing-required-packages-in-a-venv)
 - [Monitoring using Neptune.ai](#monitoring-using-neptuneai)
 - [Where all the outputs go: `exp_dir`](#where-all-the-outputs-go-exp_dir)
 - [Repository Wish List](#repository-wish-list)
 
-# Repository map
+# How to structure your project
 
 ---
-
-
-Overview of the repository. ***The most important parts are: `task`, `config`, `models`, and `stages`.***
+There will be a `task` directory containing each of your tasks, e.g., `cifar10`. For each task, you will have a set of configurations and models, which are stored in the `config` and `models` directories, respectively. Each task will also have a `stages` module for each stage of model development.
 ```
-├──  src
-│    │
-│    └── tools                     - for all other modules; tools that are repeadetly used.
-│    └── cluster.py                - contains the cluster management object.
-│    └── command_line_arguments.py - argparse for reading command line arguments.
-│    └── trainer.py                - contains a wrapper for pytorch_lightning.Trainer.
-│    └── utils.py                  - small utility definitions.
-│
-│
-│
-│
 ├──  task  
 │    │
 │    └── TASK_NAME     - name of the task, e.g., cifar10.
 │        └── config    - .yaml configuration files for a model.
 │        └── models    - .py modules that contain pytorch_lightning.LightningModule definitions that represent models.
 │        └── stages.py - training and testing stages for a task.
-│
-│
-│
-│
-├──  main.py - main.py does the following:
-│               1. Reads command line arguments using argparse.
-│               2. Imports the 'stages' function for the task from task/TASK_NAME/stages.py.
-│               3. Loads the specified configuration .yaml for the job from task/TASK_NAME/config.
-│               4. Submits the job (the configuration + 'stages') to the cluster manager (or runs it locally if 'submit' is false).
-│
-│
-│
-│
-└── requirements.txt - Packages required by the library (pip install -r requirements.txt).
 ```
 
+# Package map
+
+---
+
+The package is structured as follows:
+
+```
+├──  dlhpcstarter
+│    │
+│    ├── tools                     - for all other modules; tools that are repeadetly used.
+│    ├──  __main__.py - __main__.py does the following:
+│    │               1. Reads command line arguments using argparse.
+│    │               2. Imports the 'stages' function for the task from task/TASK_NAME/stages.py.
+│    │               3. Loads the specified configuration .yaml for the job from task/TASK_NAME/config.
+│    │               4. Submits the job (the configuration + 'stages') to the cluster manager (or runs it locally if 'submit' is false).
+│    └── cluster.py                - contains the cluster management object.
+│    └── command_line_arguments.py - argparse for reading command line arguments.
+│    └── trainer.py                - contains a wrapper for pytorch_lightning.Trainer.
+│    └── utils.py                  - small utility definitions.
+
+```
 
 # Tasks
 
@@ -268,7 +268,7 @@ Currently, there are two methods for giving arguments:
 ***`task` and `config` must be given as command line arguments for `argparse`:***
 
 ```shell
-python3 main.py --config baseline --task cifar10
+dlhpcstarter --config baseline --task cifar10
 ```
 
 ***`module`, `definition`, and `exp_dir` can be given either as command line arguments, or be placed in the configuration file.***
@@ -317,7 +317,7 @@ dataset_dir: /my/datasets/directory
 ```
 
 ```shell
-python3 main.py --config baseline_rev_a --task cifar10
+dlhpcstarter --config baseline_rev_a --task cifar10
 ```
 
 # Next level: Configuration composition via Hydra
@@ -474,17 +474,19 @@ trainer = trainer_instance(**vars(args))
 Place any of the parameters for the trainer detailed at 
 https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-class-api in your configuration file, and they will be passed to the `pytorch_lightning.Trainer` instance.
 
-# Tying it all together: `main.py`
+# Tying it all together: `dlhpcstarter`
 
 ---
 
-***This is an overview of what occurs in `main.py`, you do not need to modify it.***
+***This is an overview of what occurs when the entrypoint `dlhpcstarter` is executed, this is not necessary to understand to use the package.***
 
-The main function does the following:
+
+
+`dlhpcstarter` does the following:
 
  - Gets the command line arguments using `argparse`, e.g., arguments like this:
     ```shell
-    python3 main.py --config baseline --task cifar10
+    dlhpcstarter --config baseline --task cifar10
     ```
  - Imports the `stages` definition for the task using `src.utils.importer`.
  - Reads the configuration `.yaml` and combines it with the command line arguments.
@@ -518,7 +520,7 @@ The following arguments are used to configure a job for a cluster manager (the d
 ***These can be given as command line arguments:***
 
  ```shell
- python3 main.py --config baseline --task cifar10 --submit 1 --num-gpus 4 --num-workers 5 --memory 32GB
+dlhpcstarter --config baseline --task cifar10 --submit 1 --num-gpus 4 --num-workers 5 --memory 32GB
  ```
 
 ***Or they can be placed in the configuration `.yaml` file:***
@@ -543,29 +545,10 @@ dataset_dir: /my/datasets/directory
 ```
 And executed with:
 ```shell
- python3 main.py --config baseline --task cifar10 --submit True
+dlhpcstarter --config baseline --task cifar10 --submit True
  ```
 
-# Installing required packages in a `venv`
-
-Set the following variables:
-```shell
-ENV_NAME = /my/env/name
-REQ_PATH = /my/repositories/path/dl_hpc_starter_pack/requirements.txt
-```
-Note:
- - `ENV_NAME` can be of your choosing. 
- - `REQ_PATH` is the path of the `requirements.txt` in this repository.
-
-Then run the following with the `python` version of your choosing (most HPCs have `python` available as a module package: `module load python`):
-```
-python3 -m venv --system-site-packages $ENV_NAME
-source $ENV_NAME/bin/activate
-pip install --upgrade pip
-pip install --upgrade -r $REQ_PATH --no-cache-dir
-```
-
-If using a cluster manager, add the path to the `bin/activate` of the venv:
+If using a cluster manager, add the path to the `bin/activate` of your virtual environment:
 ```yaml
 ...
 venv_path: /my/env/name/bin/activate
