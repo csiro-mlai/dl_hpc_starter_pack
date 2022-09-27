@@ -1,9 +1,9 @@
-import os
 from argparse import Namespace
 from dlhpcstarter.command_line_arguments import read_command_line_arguments
 from dlhpcstarter.utils import importer, gpu_usage_and_visibility, load_config_and_update_args
 from dlhpcstarter.cluster import ClusterSubmit
 from typing import Callable
+import sys
 
 
 def main() -> None:
@@ -15,15 +15,13 @@ def main() -> None:
         4. Submit the job to the cluster manager (or run locally).
     """
 
+    if sys.path[0] != '':
+        sys.path.insert(0, '')
+
     """    
     1. Get command line arguments using argparse for the job:
     """
-
-    # Get command line arguments (or input your own keyword arguments object to main())
     args = read_command_line_arguments()
-
-    # Print GPU usage and set GPU visibility
-    gpu_usage_and_visibility(args.cuda_visible_devices, args.submit)
 
     """
     2. Import the 'stages' function for the task:
@@ -42,8 +40,6 @@ def main() -> None:
         This contains the paths, model configuration, the training and test configuration, the device & cluster manager 
         configuration.
     """
-
-    # Get configuration & use it to update args
     load_config_and_update_args(args=args, print_args=True)
 
     """
@@ -83,13 +79,14 @@ def submit(stages_fnc: Callable, args: Namespace):
         )
 
         # Cluster commands
-        cluster.add_manager_cmd(cmd='tasks-per-node', value=args.num_gpus if args.num_gpus else 1)
+        cluster.add_manager_cmd(cmd='ntasks-per-node', value=args.num_gpus if args.num_gpus else 1)
 
         # Source virtual environment
         cluster.add_command('source ' + args.venv_path)
 
-        # NCCL debug flag
+        # Debug flags
         cluster.add_command('export NCCL_DEBUG=INFO')
+        cluster.add_command('export PYTHONFAULTHANDLER=1')
 
         # Request the quality of service for the job
         if args.qos:

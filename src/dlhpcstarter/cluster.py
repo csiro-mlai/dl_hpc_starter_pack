@@ -185,7 +185,7 @@ class ClusterSubmit(object):
 
     def build_slurm_command(self, manager_cmd_script_path, timestamp, session):
 
-        sub_commands = ['#!/bin/bash']
+        sub_commands = ['#!/bin/bash -l']
         sub_commands.append('#SBATCH --job-name={}'.format('{}session_{}'.format(self.job_display_name, session)))
 
         if self.log_out:

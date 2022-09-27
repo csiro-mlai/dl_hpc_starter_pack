@@ -105,6 +105,10 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
     if print_args:
         print(f'args: {args.__dict__}')
 
+    # Print GPU usage and set GPU visibility
+    if args.num_gpus > 0:
+        gpu_usage_and_visibility(args.cuda_visible_devices, args.submit)
+
 
 def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int) -> str:
     """
@@ -142,7 +146,7 @@ def get_best_ckpt_path(exp_dir_trial: str, monitor_mode: str) -> str:
     ckpt_list = glob.glob(os.path.join(exp_dir_trial, '*=*=*.ckpt'))
 
     if not ckpt_list:
-        raise ValueError('No checkpoints exist in the checkpoint directory.')
+        raise ValueError(f'No checkpoints exist in the checkpoint directory: {exp_dir_trial}.')
 
     scores = [
         re.findall(r"[-+]?\d*\.\d+|\d+", i.rsplit('=', 1)[1])[0] for i in ckpt_list
