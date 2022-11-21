@@ -88,6 +88,16 @@ def submit(stages_fnc: Callable, args: Namespace):
         cluster.add_command('export NCCL_DEBUG=INFO')
         cluster.add_command('export PYTHONFAULTHANDLER=1')
 
+        # Add commands to the cluster manager submission script
+        if 'cluster_manager_script_commands' in args:
+            for i in args.cluster_manager_script_commands:
+                cluster.add_command(i)
+
+        # Add cluster manager commands
+        if 'cluster_manager_commands' in args:
+            for i in args.cluster_manager_commands:
+                cluster.add_manager_cmd(cmd=i[0], value=i[1])
+
         # Request the quality of service for the job
         if args.qos:
             cluster.add_manager_cmd(cmd='qos', value=args.qos)

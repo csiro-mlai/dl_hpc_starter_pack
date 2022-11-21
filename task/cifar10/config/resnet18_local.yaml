@@ -4,3 +4,5 @@ defaults:
 
 module: resnet18
 definition: ResNet18
+
+cluster_manager_commands: [['account', 'OD-221833']]
