@@ -232,7 +232,10 @@ def resume_from_ckpt_path(
         f'A maximum of one of these options can be set: {options}. The following are set: {set_options}.'
 
     if resumable:
-        if os.path.isfile(os.path.join(exp_dir_trial, 'last.ckpt')):
+        last_ckpt_path = os.path.join(exp_dir_trial, 'last.ckpt')
+
+        # last.ckpt will be a directory with deepspeed:
+        if os.path.isfile(last_ckpt_path) or os.path.isdir(last_ckpt_path):
             ckpt_path = os.path.join(exp_dir_trial, 'last.ckpt')
         else:
             warnings.warn('last.ckpt does not exist, starting training from epoch 0.')
