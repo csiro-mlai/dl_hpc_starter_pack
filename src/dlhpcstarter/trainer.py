@@ -39,6 +39,7 @@ def trainer_instance(
     submit: bool = False,
     neptune_api_key: Optional[str] = None,
     neptune_username: Optional[str] = None,
+    neptune_mode: Optional[str] = 'async',
     num_nodes: int = 1,
     num_gpus: Optional[int] = None,
     mbatch_size: Optional[int] = None,
@@ -85,6 +86,7 @@ def trainer_instance(
         submit - submit to cluster manager.
         neptune_api_key - API key, found on neptune.ai, for NeptuneLogger.
         neptune_username - Username for on neptune.ai, for NeptuneLogger.
+        neptune_mode - https://docs.neptune.ai/api/connection_modes/.
         num_nodes - number of nodes for the job.
         num_gpus - number of GPUs per node.
         mbatch_size - mini-batch size of dataloaders.
@@ -127,6 +129,7 @@ def trainer_instance(
                 log_model_checkpoints=False,
                 source_files=[],
                 flush_period=30,
+                mode=neptune_mode,
             )
         )
 
