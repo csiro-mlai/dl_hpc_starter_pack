@@ -74,8 +74,8 @@ def submit(stages_fnc: Callable, args: Namespace):
             num_nodes=args.num_nodes,
             num_workers=args.num_workers,
             memory=args.memory,
-            python_cmd='',
-            entrypoint='dlhpcstarter',
+            python_cmd='python3' if not hasattr(args, 'python_cmd') else args.python_cmd,
+            entrypoint='dlhpcstarter' if not hasattr(args, 'entrypoint') else args.entrypoint,
         )
 
         # Cluster commands
