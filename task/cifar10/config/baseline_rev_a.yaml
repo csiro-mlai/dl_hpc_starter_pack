@@ -1,5 +1,4 @@
 defaults:
-  - baseline
-  - _self_
+  - task/cifar10/config/baseline@_global_
 
 lr: 1e-4

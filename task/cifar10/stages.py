@@ -29,7 +29,7 @@ def stages(args: Namespace):
     trainer = trainer_instance(**vars(args))
 
     # Model definition
-    model_def = importer(definition=args.definition, module='.'.join(['task', args.task, 'model', args.module]))
+    model_def = importer(definition=args.definition, module=args.module)
 
     # Train
     if args.train:

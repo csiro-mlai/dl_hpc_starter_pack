@@ -1,5 +1,5 @@
 defaults:
-  - baseline_local
+  - task/cifar10/config/baseline@_global_
   - _self_
 
 module: resnet18

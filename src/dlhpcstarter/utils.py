@@ -1,7 +1,7 @@
 from argparse import Namespace
 from hydra import compose, initialize_config_dir
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional
 import glob
 import GPUtil
 import importlib
@@ -68,22 +68,22 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
         args.config_file_name = args.config + '.yaml'
 
     # Load configuration using Hydra's Compose API
-    args.config_dir = os.path.join(args.work_dir, 'task', args.task, 'config')
-    with initialize_config_dir(
-            version_base=None, config_dir=args.config_dir, job_name=f'{args.config}'
-    ):
-        config = compose(config_name=args.config)
+    args.config_dir = Path(args.config).parent
+    if not os.path.isabs(args.config_dir):
+        args.config_dir = os.path.join(args.work_dir, args.config_dir)
+    with initialize_config_dir(version_base=None, config_dir=args.config_dir):
+        config = compose(config_name=Path(args.config).parts[-1])
 
     # Update args with config and check for conflicts
-    args.config_full_path = os.path.join(args.config_dir, args.config_file_name)
+    args.config_full_path = os.path.join(args.work_dir, args.config_file_name)
     for k, v in config.items():
         if getattr(args, k, None) is None:
             setattr(args, k, v)
         else:
             if getattr(args, k) != v:
                 raise ValueError(f'There is a conflict between command line argument "--{k} {getattr(args, k)}" '
-                                    f'({type(getattr(args, k))}) and configuration argument "{k}: {v}" from '
-                                    f'{args.config_full_path} ({type(v)}).')
+                                 f'({type(getattr(args, k))}) and configuration argument "{k}: {v}" from '
+                                 f'{args.config_full_path} ({type(v)}).')
 
     # The model name must be defined in the configuration or in the command line arguments
     assert args.module, f'"module" must be specified as a command line argument or in {args.config_full_path}.'
@@ -106,7 +106,7 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
         print(f'args: {args.__dict__}')
 
     # Print GPU usage and set GPU visibility
-    if args.num_gpus > 0:
+    if hasattr(args, 'num_gpus'):
         gpu_usage_and_visibility(args.cuda_visible_devices, args.submit)
 
 
@@ -124,6 +124,7 @@ def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int) -> str:
     try:
         ckpt_path = glob.glob(os.path.join(exp_dir_trial, "*epoch=" + str(load_epoch) + "*.ckpt"))
         assert len(ckpt_path) == 1, f'Multiple checkpoints for epoch {load_epoch}: {ckpt_path}.'
+
     except:
         raise ValueError(
             "Epoch {} is not in the checkpoint directory.".format(str(load_epoch))

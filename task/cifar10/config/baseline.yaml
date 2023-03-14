@@ -1,11 +1,11 @@
 defaults:
-  - paths/hpc_paths@_global_
-  - cluster/2hr@_global_
+  - paths/local_paths@_global_
+#  - cluster/2hr@_global_
 #  - distributed/2gpu@_global_
-  - distributed/1gpu@_global_
+#  - distributed/1gpu@_global_
   - _self_
 
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'

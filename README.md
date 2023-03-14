@@ -25,7 +25,7 @@ pip install dlhpcstarter
 
 # Table of Contents
 
-- [How to structure your project](#how-to-structure-your-project)
+[//]: # (- [How to structure your project]&#40;#how-to-structure-your-project&#41;)
 - [Package map](#package-map)
 - [Tasks](#tasks)
 - [Models](#models)
@@ -40,18 +40,28 @@ pip install dlhpcstarter
 - [Where all the outputs go: `exp_dir`](#where-all-the-outputs-go-exp_dir)
 - [Repository Wish List](#repository-wish-list)
 
-# How to structure your project
+[//]: # (# How to structure your project)
 
----
-There will be a `task` directory containing each of your tasks, e.g., `cifar10`. For each task, you will have a set of configurations and models, which are stored in the `config` and `models` directories, respectively. Each task will also have a `stages` module for each stage of model development.
-```
-├──  task  
-│    │
-│    └── TASK_NAME     - name of the task, e.g., cifar10.
-│        └── config    - .yaml configuration files for a model.
-│        └── models    - .py modules that contain pytorch_lightning.LightningModule definitions that represent models.
-│        └── stages.py - training and testing stages for a task.
-```
+[//]: # ()
+[//]: # (---)
+
+[//]: # (There will be a `task` directory containing each of your tasks, e.g., `cifar10`. For each task, you will have a set of configurations and models, which are stored in the `config` and `models` directories, respectively. Each task will also have a `stages` module for each stage of model development.)
+
+[//]: # (```)
+
+[//]: # (├──  task  )
+
+[//]: # (│    │)
+
+[//]: # (│    └── TASK_NAME     - name of the task, e.g., cifar10.)
+
+[//]: # (│        └── config    - .yaml configuration files for a model.)
+
+[//]: # (│        └── models    - .py modules that contain pytorch_lightning.LightningModule definitions that represent models.)
+
+[//]: # (│        └── stages.py - training and testing stages for a task.)
+
+[//]: # (```)
 
 # Package map
 
@@ -258,9 +268,9 @@ Currently, there are two methods for giving arguments:
 
 ***The mandatory arguments include:***
 1. `task`, the name of the task.
-2. `config`, the name of the configuration (no extension).
-3. `module`, the name of the module that the model definition is housed.
-4. `definition`, the name of the class representing the model.
+2. `config`, relative or absolute path to the configuration file (can handle with or without extension).
+3. `module`, the module that the model definition is housed.
+4. `definition`, the class representing the model.
 5. `exp_dir`, the experiment directory, i.e., where all outputs, including model checkpoints will be saved.
 6. `monitor`, metric to monitor for [ModelCheckpoint](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.ModelCheckpoint.html) and [EarlyStopping](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.callbacks.EarlyStopping.html?highlight=earlystoppin#earlystopping) (optional), as well as test checkpoint loading (e.g., 'val_loss').
 7. `monitor_mode`, whether the monitored metric is to be maximised or minimised ('max' or 'min').
@@ -268,15 +278,12 @@ Currently, there are two methods for giving arguments:
 ***`task` and `config` must be given as command line arguments for `argparse`:***
 
 ```shell
-dlhpcstarter --config baseline --task cifar10
+dlhpcstarter --config task/cifar10/config/baseline --task cifar10
 ```
 
 ***`module`, `definition`, and `exp_dir` can be given either as command line arguments, or be placed in the configuration file.***
 
-For each model of a task, we define a configuration. Hyperparameters, paths, as well as the device configuration can be stored in a configuration file. Configuration files have the following strict requirements:
-
-1. They are stored in the `config` directory of  a task, e.g., `task/cifar10/config`.
-2. They are stored in [`YAML` format](https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started), e.g., `task/cifar10/config/baseline.yaml`.
+For each model of a task, we define a configuration. Hyperparameters, paths, as well as the device configuration can be stored in a configuration file. Configurations are in [`YAML` format](https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started), e.g., `task/cifar10/config/baseline.yaml`.
 
 # Innovate via Configuration Files
 
@@ -287,7 +294,7 @@ If we have the following configuration file for the aforementioned CIFAR10  `Bas
 ```yaml
 train: True
 test: True
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
@@ -304,7 +311,7 @@ Another way we can improve upon the baseline model, i.e., the baseline configura
 ```yaml
 train: True
 test: True
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
@@ -317,7 +324,7 @@ dataset_dir: /my/datasets/directory
 ```
 
 ```shell
-dlhpcstarter --config baseline_rev_a --task cifar10
+dlhpcstarter --config task/cifar10/config/baseline_rev_a --task cifar10
 ```
 
 # Next level: Configuration composition via Hydra
@@ -346,7 +353,7 @@ defaults:
 train: True
 test: True
 resumable: True
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
@@ -366,7 +373,7 @@ defaults:
 train: True
 test: True
 resumable: True
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
@@ -407,7 +414,7 @@ defaults:
 train: True
 test: True
 resumable: True
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
@@ -454,7 +461,7 @@ Typically, the following things happen in `stages()`:
     ```python
     from src import importer
    
-    Model = importer(definition=args.definition, module='.'.join(['task', args.task, 'model', args.module])
+    Model = importer(definition=args.definition, module=args.module)
     model = Model(**vars(args))
    ```
     See `src.utils.importer` for a handy function that imports based on strings.
@@ -486,7 +493,7 @@ https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-c
 
  - Gets the command line arguments using `argparse`, e.g., arguments like this:
     ```shell
-    dlhpcstarter --config baseline --task cifar10
+    dlhpcstarter --config task.cifar10.config.baseline --task cifar10
     ```
  - Imports the `stages` definition for the task using `src.utils.importer`.
  - Reads the configuration `.yaml` and combines it with the command line arguments.
@@ -520,7 +527,7 @@ The following arguments are used to configure a job for a cluster manager (the d
 ***These can be given as command line arguments:***
 
  ```shell
-dlhpcstarter --config baseline --task cifar10 --submit 1 --num-gpus 4 --num-workers 5 --memory 32GB
+dlhpcstarter --config task/cifar10/config/baseline --task cifar10 --submit 1 --num-gpus 4 --num-workers 5 --memory 32GB
  ```
 
 ***Or they can be placed in the configuration `.yaml` file:***
@@ -532,7 +539,7 @@ memory: '32GB'  # Added.
 
 train: True
 test: True
-module: baseline
+module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
@@ -545,7 +552,7 @@ dataset_dir: /my/datasets/directory
 ```
 And executed with:
 ```shell
-dlhpcstarter --config baseline --task cifar10 --submit True
+dlhpcstarter --config task/cifar10/config/baseline --task cifar10 --submit True
  ```
 
 If using a cluster manager, add the path to the `bin/activate` of your virtual environment:
@@ -581,7 +588,7 @@ Note: the trial number also sets the seed number for your experiment.
 # Repository Wish List
 
 ---
-
+ - Transfer cluster management over to submitit: https://ai.facebook.com/blog/open-sourcing-submitit-a-lightweight-tool-for-slurm-cluster-computation/
  - Add description about how to use https://neptune.ai/.
  - Use https://hydra.cc/ instead of argparse (or have the option to use either).
  - https://docs.ray.io/en/latest/tune/index.html for hyperparameter optimisation.
