@@ -1,2 +1,4 @@
-exp_dir: /datasets/work/hb-imageclef/work/experiments
-dataset_dir: /datasets/work/hb-mlaifsp-mm/source/Datasets
+exp_dir: /datasets/work/hb-mlaifsp-mm/work/experiments
+dataset_dir: /datasets/work/hb-mlaifsp-mm/work/datasets
+venv_path: /datasets/work/hb-mlaifsp-mm/work/environments/dlhpcstarter/bin/activate
+cluster_manager_commands: [['account', 'OD-221833']]

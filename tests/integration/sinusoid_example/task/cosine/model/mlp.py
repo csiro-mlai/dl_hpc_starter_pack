@@ -1,4 +1,4 @@
-from pytorch_lightning import LightningModule
+from lightning.pytorch import LightningModule
 from torch.utils.data import DataLoader, random_split
 from torchmetrics import Accuracy
 from typing import Dict

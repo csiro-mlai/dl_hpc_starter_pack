@@ -26,7 +26,7 @@ import numpy
 import torch
 import tqdm
 
-import pytorch_lightning  # noqa: E402
+import lightning  # noqa: E402
 
 LEVEL_OFFSET = "\t"
 KEY_PADDING = 20
@@ -73,7 +73,7 @@ def info_packages():
         "numpy": numpy.__version__,
         "pyTorch_version": torch.__version__,
         "pyTorch_debug": torch.version.debug,
-        "pytorch-lightning": pytorch_lightning.__version__,
+        "lightning": lightning.__version__,
         "tqdm": tqdm.__version__,
     }
 

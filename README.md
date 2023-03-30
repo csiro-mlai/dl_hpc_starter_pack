@@ -2,19 +2,19 @@
 
 ***Aims of this library:***
 
- - To be simple and easy to understand so that the focus is on the data science.
- - To reduce the time taken from implementation to results.
- - To promote rapid innovation of models via configuration files, class composition and/or class inheritance.
- - Reduce boilerplate code (sections of code that are repeated in multiple places with little to no variation).
- - To simplify cluster management and distributed computing with High Performance Computing (HPC).
- - Be able to easily accommodate multiple research avenues simultaneously.
- - To cooperatively improve the functionality and documentation of this repository to make it better!
+- To be simple and easy to understand so that the focus is on the data science.
+- To reduce the time taken from implementation to results.
+- To promote rapid development of models via configuration files, class composition and/or class inheritance.
+- Reduce boilerplate code (sections of code that are repeated in multiple places with little to no variation).
+- To simplify cluster management and distributed computing with High Performance Computing (HPC).
+- Be able to easily accommodate multiple research avenues simultaneously.
+- To cooperatively improve the functionality and documentation of this repository to make it better!
 
 ***Features:***
- - The [PyTorch Lightning](https://pytorch-lightning.readthedocs.io/en/latest/) `LightningModule` and `Trainer` are used to implement, train, and test models. It allows for many of the above aims to be accomplished, such as simplified distributed computing and a reduction of boilerplate code. It also allows us to simply use class inheritance and composition, allowing for rapid innovation.
- - The [Compose API](https://hydra.cc/docs/advanced/compose_api/) of [Hydra](https://hydra.cc/) is used to create a hierarchical configuration, allowing for rapid innovation.
- - [Neptune.ai](https://neptune.ai/) is used to track experiments; metric scores are automatically uploaded to [Neptune.ai](https://neptune.ai/), allowing you to easily track your experiments from your browser.
- - Scripts for submission to a cluster manager, such as [SLURM](https://slurm.schedmd.com/documentation.html) are written for you. Also, cluster manager jobs are automatically resubmitted and resumed if they haven't finished before the time-limit.
+- The [Lightning](https://pytorch-lightning.readthedocs.io/en/latest/) `LightningModule` and `Trainer` are used to implement, train, and test models. It allows for many of the above aims to be accomplished, such as simplified distributed computing and a reduction of boilerplate code. It also allows us to simply use class inheritance and composition, allowing for rapid development.
+- The [Compose API](https://hydra.cc/docs/advanced/compose_api/) of [Hydra](https://hydra.cc/) is used to create a hierarchical configuration, allowing for rapid development.
+- [Neptune.ai](https://neptune.ai/) is used to track experiments; metric scores are automatically uploaded to [Neptune.ai](https://neptune.ai/), allowing you to easily track your experiments from your browser.
+- Scripts for submission to a cluster manager, such as [SLURM](https://slurm.schedmd.com/documentation.html) are written for you. Also, cluster manager jobs are automatically resubmitted and resumed if they haven't finished before the time-limit.
 
 # Installation
 
@@ -29,9 +29,9 @@ pip install dlhpcstarter
 - [Package map](#package-map)
 - [Tasks](#tasks)
 - [Models](#models)
-- [Innovate via Model Composition and Inheritance](#innovate-via-model-composition-and-inheritance)
+- [Development via Model Composition and Inheritance](#development-via-model-composition-and-inheritance)
 - [Configuration YAML files and argparse](#configuration-yaml-files-and-argparse)
-- [Innovate via Configuration Files](#innovate-via-configuration-files)
+- [Development via Configuration Files](#development-via-configuration-files)
 - [Next level: Configuration composition via Hydra](#next-level-configuration-composition-via-hydra)
 - [Stages and Trainer](#stages-and-trainer)
 - [Tying it all together: `main.py`](#tying-it-all-together-mainpy)
@@ -57,7 +57,7 @@ pip install dlhpcstarter
 
 [//]: # (│        └── config    - .yaml configuration files for a model.)
 
-[//]: # (│        └── models    - .py modules that contain pytorch_lightning.LightningModule definitions that represent models.)
+[//]: # (│        └── models    - .py modules that contain Lightning LightningModule definitions that represent models.)
 
 [//]: # (│        └── stages.py - training and testing stages for a task.)
 
@@ -73,14 +73,15 @@ The package is structured as follows:
 ├──  dlhpcstarter
 │    │
 │    ├── tools                     - for all other modules; tools that are repeadetly used.
-│    ├──  __main__.py - __main__.py does the following:
-│    │               1. Reads command line arguments using argparse.
-│    │               2. Imports the 'stages' function for the task from task/TASK_NAME/stages.py.
-│    │               3. Loads the specified configuration .yaml for the job from task/TASK_NAME/config.
-│    │               4. Submits the job (the configuration + 'stages') to the cluster manager (or runs it locally if 'submit' is false).
+│    ├── __main__.py               - __main__.py does the following:
+│    │                                    1. Reads command line arguments using argparse.
+│    │                                    2. Imports the 'stages' function for the task from task/
+│    │                                    3. Loads the specified configuration .yaml for the job from 
+│    │                                    4. Submits the job (the configuration + 'stages') to the 
+│    │                                       cluster manager (or runs it locally if 'submit' is false).
 │    └── cluster.py                - contains the cluster management object.
 │    └── command_line_arguments.py - argparse for reading command line arguments.
-│    └── trainer.py                - contains a wrapper for pytorch_lightning.Trainer.
+│    └── trainer.py                - contains an optional wrapper for the Lightning Trainer.
 │    └── utils.py                  - small utility definitions.
 
 ```
@@ -90,51 +91,51 @@ The package is structured as follows:
 ---
 
 
-***Tasks are named based on the data and the type of prediction or inference being made***. For example:
- - Two tasks have the same data but require different names due to differing predictions, e.g., **MS-COCO Detection** and **MS-COCO Caption**.
- - Two tasks may have similar predictions but require different names due to differing data, e.g., **MNIST** and **Chinese MNIST**.
+***Tasks can have any name. The name could be based on the data or the type of inference being made***. For example:
+- Two tasks have the same data but require different names due to differing predictions, e.g., **MS-COCO Detection** and **MS-COCO Caption**.
+- Two tasks may have similar predictions but require different names due to differing data, e.g., **MNIST** and **Chinese MNIST**.
 
 ***Some publicly available tasks include***:
-- Image classification tasks, e.g., [MNIST](http://yann.lecun.com/exdb/mnist/), [CIFAR10](https://www.cs.toronto.edu/~kriz/cifar.html), [CIFAR100](https://www.cs.toronto.edu/~kriz/cifar.html), [ImageNet](https://www.image-net.org/). 
+- Image classification tasks, e.g., [MNIST](http://yann.lecun.com/exdb/mnist/), [CIFAR10](https://www.cs.toronto.edu/~kriz/cifar.html), [CIFAR100](https://www.cs.toronto.edu/~kriz/cifar.html), [ImageNet](https://www.image-net.org/).
 - Object detection tasks, e.g., [MS-COCO Detection](https://cocodataset.org/#detection-2020).
 - Image captioning detection tasks, e.g., [MS-COCO Caption](https://cocodataset.org/#captions-2015).
 - Speech recognition tasks, e.g., [LibriSpeech](https://www.openslr.org/12).
 - Chest X-Ray report generation, e.g., [MIMIC-CXR](https://physionet.org/content/mimic-cxr/2.0.0/).
 
-***How to add a task:***
+***What does the name do?***
 
-Adding a task is as simple as creating a directory with the name of the task in `task`. For example, if we choose CIFAR10 as the task, with the task name `cifar10`, then we would create the directory `task/cifar10`. The task directory will then house everything necessary for that task, for example, the models, the configurations for the models, the data pipeline, and the stages of development (training and testing).
+It is used to separate the outputs of the experiment from other tasks.
 
 # Models
 
 ---
 
 
-***Please familiarise yourself with the [`pytorch_lightning.LightningModule`](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#) in order to correctly implement a model:*** https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+***Please familiarise yourself with the [`Lightning LightningModule`](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#) in order to correctly implement a model:*** https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
 
-Once we have created our task directory (e.g., `task/cifar10`), we now want to create a model using a [`pytorch_lightning.LightningModule`](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#). Everything we need for the model can be placed in the `LightningModule`, in including commonly used libraries and objects, for example:
+A model is created using a [`Lightning LightningModule`](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#). Everything we need for the model can be placed in the `LightningModule`, including commonly used libraries and objects, for example:
 
- - [torch.nn.Module](https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module): base class for all neural networks in `PyTorch`. 
- - [transformers](https://huggingface.co/docs/transformers/index): a library containing pre-trained Transformer models.
- - [torchvision](https://pytorch.org/vision/stable/index.html): a library for image pre-processing and pre-trained computer vision models.
- - [torch.utils.data.Dataset](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset): an object that processes each instance of a dataset.
- - [torch.utils.data.DataLoader](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader): an object that samples mini-batches from a [torch.utils.data.Dataset](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset).
+- [torch.nn.Module](https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module): base class for all neural networks in `PyTorch`.
+- [transformers](https://huggingface.co/docs/transformers/index): a library containing pre-trained Transformer models.
+- [torchvision](https://pytorch.org/vision/stable/index.html): a library for image pre-processing and pre-trained computer vision models.
+- [torch.utils.data.Dataset](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset): an object that processes each instance of a dataset.
+- [torch.utils.data.DataLoader](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader): an object that samples mini-batches from a [torch.utils.data.Dataset](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset).
 
-***Note:*** 
+***Note:***
 
-- The data pipeline could be implemented within the `LightningModule` or seperately from a model using a [pytorch_lightning.LightningDataModule](https://pytorch-lightning.readthedocs.io/en/stable/extensions/datamodules.html). The `LightningModule` instance would then have to be given separately to the `pytorch_lightning.Trainer`. 
+- The data pipeline could be implemented within the `LightningModule` or seperately from a model using a [Lightning LightningDataModule](https://pytorch-lightning.readthedocs.io/en/stable/extensions/datamodules.html). The `LightningModule` instance would then have to be given separately to the `Lightning Trainer` instance.
 
 ***Example:***
 
- - An example model for `cifar10` is in [task/cifar10/model/baseline.py](https://github.com/csiro-mlai/dl_hpc_starter_pack/blob/main/task/cifar10/model/baseline.py). 
+- An example model for `cifar10` is in [task/cifar10/model/baseline.py](https://github.com/csiro-mlai/dl_hpc_starter_pack/blob/main/task/cifar10/model/baseline.py).
 
-# Innovate via Model Composition and Inheritance
+# Development via Model Composition and Inheritance
 
 ---
-To promote rapid innovation of models, we recommend using class composition and/or inheritance. ***For example, we may have a baseline that not only includes a basic model, but also the data pipeline:***
+To promote rapid development of models, one solution is to use class composition and/or inheritance. ***For example, we may have a baseline that not only includes a basic model, but also the data pipeline:***
 
 ```python
-from pytorch_lightning import LightningModule
+from lightning.pytorch import LightningModule
 from torch.utils.data import DataLoader, random_split
 import torchvision
 import torch
@@ -163,7 +164,7 @@ class Baseline(LightningModule):
     def test_dataloader(self):
         return DataLoader(self.test_set, ...)
 
-    def configure_optimizers(self):     
+    def configure_optimizers(self):
         optimiser = {'optimizer': torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)}
         return optimiser
 
@@ -192,10 +193,10 @@ class Baseline(LightningModule):
 ```
 
 After training and testing the baseline, we may want to improve upon its performance. For example, if we wanted to make the following modifications:
- 
- - Use a DenseNet instead of a ResNet.
- - Use the `AdamW` optimiser.
- - Use a warmup learning rate scheduler. 
+
+- Use a DenseNet instead of a ResNet.
+- Use the `AdamW` optimiser.
+- Use a warmup learning rate scheduler.
 
 ***All we would need to do is inherit the baseline and make our modifications:***
 
@@ -213,16 +214,16 @@ class Inheritance(Baseline):
     def configure_optimizers(self):
         optimiser = {'optimizer': torch.optim.AdamW(self.parameters(), lr=self.lr)}
         optimiser['scheduler'] = {
-                'scheduler': get_constant_schedule_with_warmup(optimiser['optimizer'], self.num_warmup_steps),
-                'interval': 'step',
-                'frequency': 1,
-            }
+            'scheduler': get_constant_schedule_with_warmup(optimiser['optimizer'], self.num_warmup_steps),
+            'interval': 'step',
+            'frequency': 1,
+        }
         return optimiser
 ```
 We could also construct a model that is the combination of the two via composition. For example, we may want to use everything from `Baseline`, but the optimiser from `Inheritance`:
 
 ```python
-from pytorch_lightning import LightningModule
+from lightning.pytorch import LightningModule
 
 class Composite(LightningModule):
     def __init__(self, **kwargs):
@@ -240,7 +241,7 @@ class Composite(LightningModule):
     def test_dataloader(self):
         return self.baseline.test_dataloader()
 
-    def configure_optimizers(self):     
+    def configure_optimizers(self):
         return Inheritance.configure_optimizers(self)  # Use configure_optimizers() from Inheritance.
 
     def forward(self, images):
@@ -268,7 +269,7 @@ Currently, there are two methods for giving arguments:
 
 ***The mandatory arguments include:***
 1. `task`, the name of the task.
-2. `config`, relative or absolute path to the configuration file (can handle with or without extension).
+2. `config`, relative or absolute path to the configuration file (with or without the extension).
 3. `module`, the module that the model definition is housed.
 4. `definition`, the class representing the model.
 5. `exp_dir`, the experiment directory, i.e., where all outputs, including model checkpoints will be saved.
@@ -285,7 +286,7 @@ dlhpcstarter --config task/cifar10/config/baseline --task cifar10
 
 For each model of a task, we define a configuration. Hyperparameters, paths, as well as the device configuration can be stored in a configuration file. Configurations are in [`YAML` format](https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started), e.g., `task/cifar10/config/baseline.yaml`.
 
-# Innovate via Configuration Files
+# Development via Configuration Files
 
 ---
 
@@ -432,54 +433,54 @@ Where `task/cifar10/config/baseline.yaml` will now include arguments from the fo
    time_limit: '02:00:00'
    venv_path: /path/to/my/venv/bin/activate
    ```
- - `task/cifar10/config/distributed/4gpu.yaml`:
-   ```yaml
-   num_gpus: 2
-   strategy: ddp
-   ```
- - `task/cifar10/config/paths/hpc.yaml`:
-   ```yaml
-   exp_dir: /path/to/my/experiments
-   dataset_dir: /path/to/my/dataset
-   ```
+- `task/cifar10/config/distributed/4gpu.yaml`:
+  ```yaml
+  num_gpus: 2
+  strategy: ddp
+  ```
+- `task/cifar10/config/paths/hpc.yaml`:
+  ```yaml
+  exp_dir: /path/to/my/experiments
+  dataset_dir: /path/to/my/dataset
+  ```
 
 See the following documentation for more information:
- - https://hydra.cc/docs/1.2/tutorials/basic/your_first_app/defaults/
- - https://hydra.cc/docs/1.2/advanced/defaults_list/#composition-order
- - https://hydra.cc/docs/1.2/advanced/overriding_packages/
+- https://hydra.cc/docs/1.2/tutorials/basic/your_first_app/defaults/
+- https://hydra.cc/docs/1.2/advanced/defaults_list/#composition-order
+- https://hydra.cc/docs/1.2/advanced/overriding_packages/
 
 # Stages and Trainer
 
 ---
 
 
-In each task directory is a Python module called `stages.py`, which contains the `stages` definition. This definition takes an object as input that houses the configuration for a job.  
+In each task directory is a Python module called `stages.py`, which contains the `stages` definition. This definition takes an object as input that houses the configuration for a job.
 
 Typically, the following things happen in `stages()`:
 
- - The `LightningModule` model is imported via the `model` argument, e.g.,
-    ```python
-    from src import importer
-   
-    Model = importer(definition=args.definition, module=args.module)
-    model = Model(**vars(args))
-   ```
-    See `src.utils.importer` for a handy function that imports based on strings.
- - A `pytorch_lightning.Trainer` instance is created, e.g., `trainer = pytorch_lightning.Trainer(...)`.
- - The model is trained using trainer: `trainer.fit(model)`.
- - The model is tested using trainer: `trainer.test(model)`.
+- The `LightningModule` model is imported via the `model` argument, e.g.,
+   ```python
+   from src import importer
+  
+   Model = importer(definition=args.definition, module=args.module)
+   model = Model(**vars(args))
+  ```
+  See `src.utils.importer` for a handy function that imports based on strings.
+- A `Lightning Trainer` instance is created, e.g., `trainer = lightning.pytorch.Trainer(...)`.
+- The model is trained using trainer: `trainer.fit(model)`.
+- The model is tested using trainer: `trainer.test(model)`.
 
-It handles the training and testing of a model for a task by using a [`pytorch_lightning.Trainer`](https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html).
+It handles the training and testing of a model for a task by using a [`Lightning Trainer`](https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html).
 
-***A helpful wrapper at `src/trainer.py` exists that passes frequently used and useful `callbacks`, `loggers`, and `plugins` to a `pytorch_lightning.Trainer` instance:***
+***A helpful wrapper at `src/trainer.py` exists that passes frequently used and useful `callbacks`, `loggers`, and `plugins` to a `Lightning Trainer` instance:***
 
 ```python
 from src.dlhpcstarter.trainer import trainer_instance
 
 trainer = trainer_instance(**vars(args))
 ```
-Place any of the parameters for the trainer detailed at 
-https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-class-api in your configuration file, and they will be passed to the `pytorch_lightning.Trainer` instance.
+Place any of the parameters for the trainer detailed at
+https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-class-api in your configuration file, and they will be passed to the `Lightning Trainer` instance.
 
 # Tying it all together: `dlhpcstarter`
 
@@ -491,13 +492,13 @@ https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-c
 
 `dlhpcstarter` does the following:
 
- - Gets the command line arguments using `argparse`, e.g., arguments like this:
-    ```shell
-    dlhpcstarter --config task.cifar10.config.baseline --task cifar10
-    ```
- - Imports the `stages` definition for the task using `src.utils.importer`.
- - Reads the configuration `.yaml` and combines it with the command line arguments.
- - Submits `stages` to the cluster manager if `args.submit = True` or runs `stages` locally. The command line arguments and the configuration arguments are passed to `stages` in both cases.
+- Gets the command line arguments using `argparse`, e.g., arguments like this:
+   ```shell
+   dlhpcstarter --config task.cifar10.config.baseline --task cifar10
+   ```
+- Imports the `stages` definition for the task using `src.utils.importer`.
+- Reads the configuration `.yaml` and combines it with the command line arguments.
+- Submits `stages` to the cluster manager if `args.submit = True` or runs `stages` locally. The command line arguments and the configuration arguments are passed to `stages` in both cases.
 
 # Cluster manager and distributed computing
 
@@ -588,9 +589,9 @@ Note: the trial number also sets the seed number for your experiment.
 # Repository Wish List
 
 ---
- - Transfer cluster management over to submitit: https://ai.facebook.com/blog/open-sourcing-submitit-a-lightweight-tool-for-slurm-cluster-computation/
- - Add description about how to use https://neptune.ai/.
- - Use https://hydra.cc/ instead of argparse (or have the option to use either).
- - https://docs.ray.io/en/latest/tune/index.html for hyperparameter optimisation.
- - Notebook examples.
+- Transfer cluster management over to submitit: https://ai.facebook.com/blog/open-sourcing-submitit-a-lightweight-tool-for-slurm-cluster-computation/
+- Add description about how to use https://neptune.ai/.
+- Use https://hydra.cc/ instead of argparse (or have the option to use either).
+- https://docs.ray.io/en/latest/tune/index.html for hyperparameter optimisation.
+- Notebook examples.
 

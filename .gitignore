@@ -1,4 +1,6 @@
 .idea/
+.vscode/
+.neptune/
 
 # My ingore
 .neptune/

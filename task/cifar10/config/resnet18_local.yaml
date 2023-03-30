@@ -1,8 +1,0 @@
-defaults:
-  - task/cifar10/config/baseline@_global_
-  - _self_
-
-module: resnet18
-definition: ResNet18
-
-cluster_manager_commands: [['account', 'OD-221833']]

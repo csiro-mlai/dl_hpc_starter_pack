@@ -29,7 +29,7 @@ class ClusterSubmit(object):
             no_srun: bool = False,
             python_cmd: str = 'python3',
             entrypoint: Optional[str] = None,
-            resubmit: bool = True,
+            # resubmit: bool = True,
     ):
         """
         Argument/s:
@@ -48,7 +48,7 @@ class ClusterSubmit(object):
             no_srun - don't use 'srun'.
             python_cmd - python command name.
             entrypoint - entrypoint to use instead of a script.
-            resubmit - automatically resubmit job just before timout.
+            # resubmit - automatically resubmit job just before timout.
         """
         self.fnc = fnc
         self.fnc_kwargs = fnc_kwargs
@@ -65,7 +65,7 @@ class ClusterSubmit(object):
         self.no_srun = no_srun
         self.python_cmd = python_cmd
         self.entrypoint = entrypoint
-        self.resubmit = resubmit
+        # self.resubmit = resubmit
 
         self.script_name = os.path.realpath(sys.argv[0])
         self.manager_commands = []
@@ -98,15 +98,15 @@ class ClusterSubmit(object):
             self.schedule_experiment(self.get_max_session_number(scripts_path))
 
     def run(self):
-        if self.resubmit:
-            print('Setting signal to automatically requeue the job before timeout.')
-            signal.signal(signal.SIGUSR1, self.sig_handler)
-            signal.signal(signal.SIGTERM, self.term_handler)
-        else:
-            print("Automatic requeuing has not been set. The job will not be requeued after timeout.")
+        # if self.resubmit:
+        #     print('Setting signal to automatically requeue the job before timeout.')
+        #     signal.signal(signal.SIGUSR1, self.sig_handler)
+        #     signal.signal(signal.SIGTERM, self.term_handler)
+        # else:
+        #     print("Automatic requeuing has not been set. The job will not be requeued after timeout.")
+
         try:
             self.fnc(self.fnc_kwargs)
-
         except Exception as e:
             print('Caught exception in worker thread', e)
             traceback.print_exc()
@@ -132,20 +132,20 @@ class ClusterSubmit(object):
         else:
             print('Launch failed...')
 
-    def call_resume(self):
-        job_id = os.environ['SLURM_JOB_ID']
-        cmd = 'scontrol requeue {}'.format(job_id)
-        print(f'\nRequeing job {job_id}...')
-        result = call(cmd, shell=True)
-        if result == 0:
-            print(f'Requeued job {job_id}.')
-        else:
-            print('Requeue failed...')
-        os._exit(0)
-
-    def sig_handler(self, signum, frame):
-        print(f"Caught signal: {signum}")
-        self.call_resume()
+    # def call_resume(self):
+    #     job_id = os.environ['SLURM_JOB_ID']
+    #     cmd = 'scontrol requeue {}'.format(job_id)
+    #     print(f'\nRequeing job {job_id}...')
+    #     result = call(cmd, shell=True)
+    #     if result == 0:
+    #         print(f'Requeued job {job_id}.')
+    #     else:
+    #         print('Requeue failed...')
+    #     os._exit(0)
+    #
+    # def sig_handler(self, signum, frame):
+    #     print(f"Caught signal: {signum}")
+    #     self.call_resume()
 
     def term_handler(self, signum, frame):
         print("Bypassing sigterm.")
@@ -208,6 +208,9 @@ class ClusterSubmit(object):
 
         sub_commands.append('#SBATCH --nodes={}'.format(self.num_nodes))
         sub_commands.append('#SBATCH --mem={}'.format(self.memory))
+
+        # To automatically resubmit via Lightning:
+        #   https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html#design-your-training-script
         sub_commands.append(f'#SBATCH --signal=USR1@{6 * 60}')
 
         mail_type = []

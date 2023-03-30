@@ -1,6 +1,9 @@
 defaults:
   - baseline
+  - paths/hpc_paths@_global_
+  - cluster/15min@_global_
   - _self_
 
-module: resnet18
+module: task.cifar10.model.resnet18
 definition: ResNet18
+max_epochs: 1000

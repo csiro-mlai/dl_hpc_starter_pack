@@ -1,8 +1,5 @@
 import argparse
 
-def str_to_bool(s):
-    return s.lower() in ('yes', 'true', 't', '1')
-
 
 def read_command_line_arguments():
     """
@@ -38,14 +35,20 @@ def read_command_line_arguments():
     # Model module and definition
     model = parser.add_argument_group('Model module name and definition')
     model.add_argument('--definition', type=str, help='Class definition of the model')
-    model.add_argument('--module', type=str, help='Name of the module in task/TASK_NAME/model')
+    model.add_argument('--module', type=str, help='Name of the module')
+
+    # Stages module and definition
+    model = parser.add_argument_group('Stages module name and definition')
+    model.add_argument('--stages_definition', default=None, type=str, help='Definition of stages')
+    model.add_argument('--stages_module', default=None, type=str, help='Name of the module')
 
     # Training arguments
     training_arguments = parser.add_argument_group('Training arguments')
-    training_arguments.add_argument('--train', type=str_to_bool, help='Perform training')
+    training_arguments.add_argument('--train',  default=False, action='store_true', help='Perform training')
     training_arguments.add_argument('--trial', type=int, help='The trial number')
     training_arguments.add_argument(
-        '--resumable', type=str_to_bool, help='Resumable training. Automatic resubmission to cluster manager',
+        '--resumable',  default=False, action='store_true', help='Resumable training. Automatic resubmission to '
+                                                                 'cluster manager',
     )
     training_arguments.add_argument('--resume-epoch', '--resume_epoch', type=int, help='Epoch to resume training from')
     training_arguments.add_argument(
@@ -64,25 +67,26 @@ def read_command_line_arguments():
 
     # Test arguments
     test = parser.add_argument_group('Testing arguments')
-    test.add_argument('--test', type=str_to_bool, help='Evaluate the model on the test set')
+    test.add_argument('--test',  default=False, action='store_true', help='Evaluate the model on the test set')
     test.add_argument('--test-epoch', '--test_epoch', type=int, help='Test epoch')
     test.add_argument('--test-ckpt-path', '--test_ckpt_path', type=str, help='Path to checkpoint to be tested')
 
     # PyTorch Lightning Trainer arguments
     trainer = parser.add_argument_group('PyTorch Lightning Trainer arguments')
-    trainer.add_argument('--debug', type=str_to_bool, help='One mini-batch for training, validation, and testing')
+    trainer.add_argument('--debug', default=False, action='store_true', help='One mini-batch for training, validation, '
+                                                                             'and testing')
 
     # Distributed computing arguments
     distributed = parser.add_argument_group('Distributed computing arguments')
     distributed.add_argument('--num-workers', '--num_workers', type=int, help='No. of workers per DataLoader & GPU')
-    distributed.add_argument('--num-gpus', '--num_gpus', type=int, help='Number of GPUs per node')
+    distributed.add_argument('--devices', default=1, type=int, help='Number of devices per node')
     distributed.add_argument('--num-nodes', '--num_nodes', type=int, help='Number of nodes')
 
     # Cluster manager arguments
     cluster = parser.add_argument_group('Cluster manager arguments')
     cluster.add_argument('--memory', type=str, help='Amount of memory per node')
     cluster.add_argument('--time-limit', '--time_limit', type=str, help='Job time limit')
-    cluster.add_argument('--submit', type=str_to_bool, help='Submit job to the cluster manager')
+    cluster.add_argument('--submit',  default=False, action='store_true', help='Submit job to the cluster manager')
     cluster.add_argument('--qos', type=str, help='Quality of service')
     cluster.add_argument('--begin', type=str, help='When to begin the Slurm job, e.g. now+1hour')
     cluster.add_argument('--slurm-cmd-path', '--slurm_cmd_path', type=str)

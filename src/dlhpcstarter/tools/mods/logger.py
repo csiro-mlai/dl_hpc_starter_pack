@@ -26,10 +26,10 @@ from typing import Any, Dict, Optional, Union
 
 import torch
 
-from pytorch_lightning.core.saving import save_hparams_to_yaml
-from pytorch_lightning.loggers.base import LightningLoggerBase, rank_zero_experiment
-from pytorch_lightning.utilities.logger import _add_prefix, _convert_params
-from pytorch_lightning.utilities.rank_zero import rank_zero_only, rank_zero_warn
+from lightning.pytorch.core.saving import save_hparams_to_yaml
+from lightning.pytorch.loggers.base import LightningLoggerBase, rank_zero_experiment
+from lightning.pytorch.utilities.logger import _add_prefix, _convert_params
+from lightning.pytorch.utilities.rank_zero import rank_zero_only, rank_zero_warn
 
 log = logging.getLogger(__name__)
 
@@ -113,8 +113,8 @@ class CSVLogger(LightningLoggerBase):
     Logs are saved to ``os.path.join(save_dir, name, version)``.
 
     Example:
-        >>> from pytorch_lightning import Trainer
-        >>> from pytorch_lightning.loggers import CSVLogger
+        >>> from lightning.pytorch import Trainer
+        >>> from lightning.pytorch.loggers import CSVLogger
         >>> logger = CSVLogger("logs", name="my_exp_name")
         >>> trainer = Trainer(logger=logger)
 

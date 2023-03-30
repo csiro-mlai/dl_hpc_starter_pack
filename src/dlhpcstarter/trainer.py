@@ -1,14 +1,12 @@
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import (
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
 )
-from pytorch_lightning.loggers import NeptuneLogger
-from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
-from pytorch_lightning.plugins.environments import SLURMEnvironment
-from dlhpcstarter.tools.mods.logger import CSVLogger
-from dlhpcstarter.utils import resume_from_ckpt_path
+from lightning.pytorch.loggers import NeptuneLogger
+from lightning.pytorch.loggers.csv_logs import CSVLogger
+from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
 from typing import Optional
 import inspect
 import logging
@@ -29,19 +27,16 @@ def trainer_instance(
     divergence_threshold: Optional[float] = None,
     exp_dir_trial: Optional[str] = None,
     resumable: bool = True,
-    resume_epoch: Optional[int] = None,
-    resume_ckpt_path: Optional[str] = None,
     sched_inter: Optional[str] = None,  # 'step', 'epoch', or None.
     save_top_k: int = 1,
     every_n_epochs: Optional[int] = 1,
     every_n_train_steps: Optional[int] = None,
     debug: bool = False,
-    submit: bool = False,
     neptune_api_key: Optional[str] = None,
     neptune_username: Optional[str] = None,
     neptune_mode: Optional[str] = 'async',
     num_nodes: int = 1,
-    num_gpus: Optional[int] = None,
+    devices: Optional[int] = 1,
     mbatch_size: Optional[int] = None,
     accumulated_mbatch_size: Optional[int] = None,
     deterministic: bool = True,
@@ -52,12 +47,12 @@ def trainer_instance(
     **kwargs,
 ) -> Trainer:
     """
-    Creates an instance of pytorch_lightning.Trainer using key callbacks and loggers. Also changes some
-    defaults for the init of pytorch_lightning.Trainer.
+    Creates an instance of lightning.pytorch.Trainer using key callbacks and loggers. Also changes some
+    defaults for the init of lightning.pytorch.Trainer.
 
-    Parameters for pytorch_lightning.Trainer are described here:
+    Parameters for lightning.pytorch.Trainer are described here:
         https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-class-api
-    These will be captured by kwargs and passed to pytorch_lightning.Trainer
+    These will be captured by kwargs and passed to lightning.pytorch.Trainer
 
     Argument/s:
         monitor - metric to monitor for EarlyStopping and ModelCheckpoint.
@@ -75,20 +70,17 @@ def trainer_instance(
         divergence_threshold - stop training as soon as the monitored quantity becomes worse than this threshold.
         exp_dir_trial - experiment directory for the trial. All outputs are saved to this path.
         resumable - whether the last completed epoch is saved to enable resumable training.
-        resume_epoch - the epoch to resume training from.
-        resume_ckpt_path - resume training from the specified checkpoint.
         sched_inter - learning rate scheduler interval ('step' or 'epoch').
         save_top_k - best k models saved according to the monitored metric. If
             0, no models are saved. If -1, all models are saved.
         every_n_epochs - save model every n epochs.
         every_n_epochs - save model every n training steps.
         debug - training, validation, and testing are completed using one mini-batch.
-        submit - submit to cluster manager.
         neptune_api_key - API key, found on neptune.ai, for NeptuneLogger.
         neptune_username - Username for on neptune.ai, for NeptuneLogger.
         neptune_mode - https://docs.neptune.ai/api/connection_modes/.
         num_nodes - number of nodes for the job.
-        num_gpus - number of GPUs per node.
+        devices - number of devices per node.
         mbatch_size - mini-batch size of dataloaders.
         accumulated_mbatch_size - desired accumulated mini-batch size.
         deterministic - ensures that the training is deterministic.
@@ -100,14 +92,8 @@ def trainer_instance(
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
-    """
-    Potential default callbacks to add:
-        - SLURMEnvironment(auto_requeue=True)  # This could be used in place of the auto requeue in transmodal.cluster
-    """
     callbacks = [] if callbacks is None else callbacks
     plugins = [] if plugins is None else plugins
-    if submit:
-        plugins.append(SLURMEnvironment(auto_requeue=False))
 
     # Loggers
     loggers.append(CSVLogger(exp_dir_trial, name='', version=''))
@@ -188,32 +174,30 @@ def trainer_instance(
 
     # Accumulate gradient batches
     if accumulated_mbatch_size:
-        devices = num_gpus * num_nodes if num_gpus * num_nodes > 0 else 1
-        accumulate_grad_batches = accumulated_mbatch_size / (mbatch_size * devices)
+        total_devices = devices * num_nodes if devices * num_nodes > 0 else 1
+        accumulate_grad_batches = accumulated_mbatch_size / (mbatch_size * total_devices)
         assert accumulate_grad_batches.is_integer(), f'Desired accumulated_mbatch_size ({accumulated_mbatch_size}) ' \
-                                                     f'can not be attained with mbatch_size={mbatch_size}, num_gpus=' \
-                                                     f'{num_gpus}, and num_nodes={num_nodes}'
+                                                     f'can not be attained with mbatch_size={mbatch_size}, devices=' \
+                                                     f'{devices}, and num_nodes={num_nodes}'
         accumulate_grad_batches = int(accumulate_grad_batches)
+    else:
+        accumulate_grad_batches = 1
 
-    # Resume from checkpoint
-    ckpt_path = resume_from_ckpt_path(exp_dir_trial, resumable, resume_epoch, resume_ckpt_path)
-
-    # Remove keyword arguments not associated with pytorch_lightning.Trainer.
-    # Parameters associated with pytorch_lightning.Trainer:
+    # Remove keyword arguments not associated with lightning.pytorch.Trainer.
+    # Parameters associated with lightning.pytorch.Trainer:
     #   https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-class-api
     kwargs = {k: v for k, v in kwargs.items() if k in inspect.signature(Trainer).parameters}
 
-    # pytorch_lightning.Trainer
+    # lightning.pytorch.Trainer
     return Trainer(
         logger=loggers,
         callbacks=callbacks,
         plugins=plugins,
         fast_dev_run=debug,
-        gpus=num_gpus,
+        devices=devices,
         num_nodes=num_nodes,
         accumulate_grad_batches=accumulate_grad_batches,
         deterministic=deterministic,
         num_sanity_val_steps=num_sanity_val_steps,
-        resume_from_checkpoint=ckpt_path,
         **kwargs,
     )

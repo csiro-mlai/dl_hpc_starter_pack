@@ -1,5 +1,5 @@
 from argparse import Namespace
-from pytorch_lightning.utilities.seed import seed_everything
+from lightning.pytorch.utilities.seed import seed_everything
 from dlhpcstarter.tools.ext.collect_env_details import main as collect_env_details
 from dlhpcstarter.trainer import trainer_instance
 from dlhpcstarter.utils import get_test_ckpt_path, importer, load_config_and_update_args, write_test_ckpt_path

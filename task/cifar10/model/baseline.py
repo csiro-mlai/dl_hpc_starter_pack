@@ -1,4 +1,4 @@
-from pytorch_lightning import LightningModule
+from lightning import LightningModule
 from torch.utils.data import DataLoader, random_split
 from torchmetrics import Accuracy
 from typing import Dict
@@ -94,8 +94,8 @@ class Baseline(LightningModule):
         )
 
         # Evaluation metrics
-        self.val_accuracy = Accuracy()
-        self.test_accuracy = Accuracy()
+        self.val_accuracy = Accuracy('multiclass', num_classes=10)
+        self.test_accuracy = Accuracy('multiclass', num_classes=10)
 
     def setup(self, stage=None):
         """

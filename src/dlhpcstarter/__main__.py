@@ -1,6 +1,6 @@
 from argparse import Namespace
 from dlhpcstarter.command_line_arguments import read_command_line_arguments
-from dlhpcstarter.utils import importer, gpu_usage_and_visibility, load_config_and_update_args
+from dlhpcstarter.utils import importer, load_config_and_update_args
 from dlhpcstarter.cluster import ClusterSubmit
 from typing import Callable
 import sys
@@ -26,13 +26,20 @@ def main() -> None:
     """
     2. Import the 'stages' function for the task:
     
-        Imports the function that handles the training and testing stages for the task. This is the stages() function
-        defined in the task's stages.py. The model is also defined in the stages function based on the configuration.
+        Imports the function that handles the training and testing stages for the task. The default location of the 
+        stages() function is in the task's stages.py. The model is also initialised in the stages function based on the 
+        configuration.
+        
+        The definition and module of the stages function can also be manually set using 'stages_definition' and 
+        'stages_module', respectively.
     
         For example: stages() in task.cifar10.stages 
     
     """
-    stages_fnc = importer(definition='stages', module='.'.join(['task', args.task, 'stages']))
+    args.stages_definition = 'stages' if hasattr(args, 'stages_definition') else args.stages_definition
+    args.stages_module = '.'.join(['task', args.task, 'stages']) if hasattr(args, 'stages_module') \
+        else args.stages_module
+    stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
 
     """
     3. Load the configuration for the job and add it to 'args':
@@ -70,7 +77,7 @@ def submit(stages_fnc: Callable, args: Namespace):
             fnc=stages_fnc,
             save_dir=args.exp_dir_trial,
             time_limit=args.time_limit,
-            num_gpus=args.num_gpus,
+            num_gpus=args.devices,
             num_nodes=args.num_nodes,
             num_workers=args.num_workers,
             memory=args.memory,
@@ -79,7 +86,7 @@ def submit(stages_fnc: Callable, args: Namespace):
         )
 
         # Cluster commands
-        cluster.add_manager_cmd(cmd='ntasks-per-node', value=args.num_gpus if args.num_gpus else 1)
+        cluster.add_manager_cmd(cmd='ntasks-per-node', value=args.devices if args.devices else 1)
 
         # Source virtual environment
         cluster.add_command('source ' + args.venv_path)

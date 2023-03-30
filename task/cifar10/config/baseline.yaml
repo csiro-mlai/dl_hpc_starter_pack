@@ -1,18 +1,12 @@
 defaults:
-  - paths/local_paths@_global_
-#  - cluster/2hr@_global_
-#  - distributed/2gpu@_global_
-#  - distributed/1gpu@_global_
+  - paths/hpc_paths@_global_
+  - cluster/2hr@_global_
   - _self_
 
 module: task.cifar10.model.baseline
 definition: Baseline
 monitor: 'val_acc'
 monitor_mode: 'max'
-
-train: True
-test: True
-resumable: True
 
 lr: 1e-3
 max_epochs: 3
