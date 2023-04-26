@@ -1,6 +1,6 @@
 defaults:
-  - paths/hpc_paths@_global_
-  - cluster/2hr@_global_
+  - ancillary/hpc_paths@_global_
+  - ancillary/2hr@_global_
   - _self_
 
 module: task.cifar10.model.baseline

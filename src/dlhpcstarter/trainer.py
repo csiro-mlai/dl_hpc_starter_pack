@@ -1,42 +1,41 @@
+import inspect
+import logging
+from typing import Optional
+
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import (
-    EarlyStopping,
-    LearningRateMonitor,
-    ModelCheckpoint,
-)
+from lightning.pytorch.callbacks import (EarlyStopping, LearningRateMonitor,
+                                         ModelCheckpoint)
 from lightning.pytorch.loggers import NeptuneLogger
 from lightning.pytorch.loggers.csv_logs import CSVLogger
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
-from typing import Optional
-import inspect
-import logging
+
 logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
 ).setLevel(logging.CRITICAL)
+from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 
 def trainer_instance(
-    monitor: str,
-    monitor_mode: str,
     task: str,
-    config: str,
+    config_name: str,
     trial: int,
+    monitor: Optional[str] = None,
+    monitor_mode: str = 'min',
     early_stopping: bool = False,
     patience: int = 0,
     min_delta: float = 0.0,
     divergence_threshold: Optional[float] = None,
     exp_dir_trial: Optional[str] = None,
-    resumable: bool = True,
     sched_inter: Optional[str] = None,  # 'step', 'epoch', or None.
     save_top_k: int = 1,
     every_n_epochs: Optional[int] = 1,
     every_n_train_steps: Optional[int] = None,
-    debug: bool = False,
     neptune_api_key: Optional[str] = None,
     neptune_username: Optional[str] = None,
     neptune_mode: Optional[str] = 'async',
     num_nodes: int = 1,
     devices: Optional[int] = 1,
+    submit: bool = False,
     mbatch_size: Optional[int] = None,
     accumulated_mbatch_size: Optional[int] = None,
     deterministic: bool = True,
@@ -55,12 +54,12 @@ def trainer_instance(
     These will be captured by kwargs and passed to lightning.pytorch.Trainer
 
     Argument/s:
+        task - name of the task.
+        config_name - name of the configuration.
+        trial - trial identifier.
         monitor - metric to monitor for EarlyStopping and ModelCheckpoint.
         monitor_mode - whether the metric to be monitored is to be maximised or
             minimised.
-        task - name of the task.
-        config - name of the configuration.
-        trial - trial identifier.
         early_stopping - stop training when a monitored metric has stopped
             improving.
         patience - no. of epochs with no improvement after which training will
@@ -69,18 +68,17 @@ def trainer_instance(
             improvement.
         divergence_threshold - stop training as soon as the monitored quantity becomes worse than this threshold.
         exp_dir_trial - experiment directory for the trial. All outputs are saved to this path.
-        resumable - whether the last completed epoch is saved to enable resumable training.
         sched_inter - learning rate scheduler interval ('step' or 'epoch').
         save_top_k - best k models saved according to the monitored metric. If
             0, no models are saved. If -1, all models are saved.
         every_n_epochs - save model every n epochs.
         every_n_epochs - save model every n training steps.
-        debug - training, validation, and testing are completed using one mini-batch.
         neptune_api_key - API key, found on neptune.ai, for NeptuneLogger.
         neptune_username - Username for on neptune.ai, for NeptuneLogger.
         neptune_mode - https://docs.neptune.ai/api/connection_modes/.
         num_nodes - number of nodes for the job.
         devices - number of devices per node.
+        submit - submit to cluster manager.
         mbatch_size - mini-batch size of dataloaders.
         accumulated_mbatch_size - desired accumulated mini-batch size.
         deterministic - ensures that the training is deterministic.
@@ -95,11 +93,20 @@ def trainer_instance(
     callbacks = [] if callbacks is None else callbacks
     plugins = [] if plugins is None else plugins
 
+    if submit:
+        # Unsure if Lightning's SLURMEnvironment features fault-tolerant training.
+        plugins.append(SLURMEnvironment(auto_requeue=False))
+
+    # Deepspeed has its own autocast capabilities:
+    if 'strategy' in kwargs and 'precision' in kwargs:
+        if 'deepspeed' in kwargs['strategy'] and kwargs['precision'] == 16:
+            raise ValueError('DeepSpeed and "precision=16" are incompatible as DeepSpeed has its own autocast functionality.')
+
     # Loggers
-    loggers.append(CSVLogger(exp_dir_trial, name='', version=''))
-    loggers.append(TensorBoardLogger(exp_dir_trial, name='', version='', default_hp_metric=False))
+    loggers.append(CSVLogger(exp_dir_trial))
+    loggers.append(TensorBoardLogger(exp_dir_trial, default_hp_metric=False))
     if neptune_api_key is not None:
-        custom_run_id = f'{config[:16]}_trial_{trial}'
+        custom_run_id = f'{config_name[:21]}_t_{trial}'
         assert len(custom_run_id) <= 32, '"custom_run_id" must be less than or equal to 32 characters'
         assert neptune_username is not None, 'You must specify your neptune.ai username.'
         loggers.append(
@@ -125,6 +132,7 @@ def trainer_instance(
     assert save_top_k != 0, '"save_top_k" is 0, therefore, no checkpoints will be saved.'
 
     if every_n_epochs:
+        save_top_k = save_top_k if monitor is not None else -1
         callbacks.append(
             ModelCheckpoint(
                 dirpath=exp_dir_trial,
@@ -132,31 +140,36 @@ def trainer_instance(
                 mode=monitor_mode,
                 save_top_k=save_top_k,
                 every_n_epochs=every_n_epochs,
-                filename='{epoch:d}-{' + monitor + ':f}',
+                filename='{epoch:d}-{step:d}-{' + monitor + ':f}' if monitor else '{epoch:d}-{step:d}',
                 save_last=True,
             )
         )
+        if 'strategy' in kwargs:
+            if 'deepspeed_stage_3' in kwargs['strategy']: 
+                callbacks[-1].FILE_EXTENSION = ""
 
-    if every_n_train_steps:
-        if resumable:
-            raise ValueError('Cannot resume training from a checkpoint that ended before the epoch ended. Fault '
-                             'tolerant training needs to be implemented for this: '
-                             'https://pytorch-lightning.readthedocs.io/en/latest/clouds'
-                             '/fault_tolerant_training_expert.html#enable-fault-tolerant-behavior-on-your-own-cluster')
-        callbacks.append(
-            ModelCheckpoint(
-                dirpath=exp_dir_trial,
-                monitor=monitor,
-                mode=monitor_mode,
-                save_top_k=save_top_k,
-                every_n_train_steps=every_n_train_steps,
-                filename='{step:d}-{' + monitor + ':f}',
-                save_last=False,  # cannot resume from this checkpoint.
-            )
-        )
+    # if every_n_train_steps:
+    #     if resumable:
+    #         raise ValueError('Cannot resume training from a checkpoint that ended before the epoch ended. Fault '
+    #                          'tolerant training needs to be implemented for this: '
+    #                          'https://pytorch-lightning.readthedocs.io/en/latest/clouds'
+    #                          '/fault_tolerant_training_expert.html#enable-fault-tolerant-behavior-on-your-own-cluster')
+    #     callbacks.append(
+    #         ModelCheckpoint(
+    #             dirpath=exp_dir_trial,
+    #             monitor=monitor,
+    #             mode=monitor_mode,
+    #             save_top_k=save_top_k,
+    #             every_n_train_steps=every_n_train_steps,
+    #             filename='{step:d}-{' + monitor + ':f}',
+    #             save_last=False,  # cannot resume from this checkpoint.
+    #         )
+    #     )
 
     # Early stopping
     if early_stopping:
+        if 'strategy' in kwargs:
+            assert 'deepspeed' not in kwargs['strategy'], 'DeepSpeed does not work with early stopping currently.'
         callbacks.append(
             EarlyStopping(
                 monitor=monitor,
@@ -164,7 +177,7 @@ def trainer_instance(
                 min_delta=min_delta,
                 patience=patience,
                 divergence_threshold=divergence_threshold,
-                verbose=False,
+                verbose=True,
             )
         )
 
@@ -190,10 +203,10 @@ def trainer_instance(
 
     # lightning.pytorch.Trainer
     return Trainer(
+        default_root_dir=exp_dir_trial, # Needed for hpc_ckpt save path. 
         logger=loggers,
         callbacks=callbacks,
         plugins=plugins,
-        fast_dev_run=debug,
         devices=devices,
         num_nodes=num_nodes,
         accumulate_grad_batches=accumulate_grad_batches,

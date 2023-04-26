@@ -2,3 +2,4 @@ exp_dir: /datasets/work/hb-mlaifsp-mm/work/experiments
 dataset_dir: /datasets/work/hb-mlaifsp-mm/work/datasets
 venv_path: /datasets/work/hb-mlaifsp-mm/work/environments/dlhpcstarter/bin/activate
 cluster_manager_commands: [['account', 'OD-221833']]
+email: aaron.nicolson@csiro.au

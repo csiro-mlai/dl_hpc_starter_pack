@@ -36,9 +36,8 @@ def main() -> None:
         For example: stages() in task.cifar10.stages 
     
     """
-    args.stages_definition = 'stages' if hasattr(args, 'stages_definition') else args.stages_definition
-    args.stages_module = '.'.join(['task', args.task, 'stages']) if hasattr(args, 'stages_module') \
-        else args.stages_module
+    args.stages_definition = 'stages' if args.stages_definition is None else args.stages_definition
+    assert args.stages_module, f'"stages_module" must be specified as a command line argument.'
     stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
 
     """
@@ -83,6 +82,7 @@ def submit(stages_fnc: Callable, args: Namespace):
             memory=args.memory,
             python_cmd='python3' if not hasattr(args, 'python_cmd') else args.python_cmd,
             entrypoint='dlhpcstarter' if not hasattr(args, 'entrypoint') else args.entrypoint,
+            resubmit=True,
         )
 
         # Cluster commands
@@ -113,7 +113,7 @@ def submit(stages_fnc: Callable, args: Namespace):
         cluster.notify_job_status(email=args.email, on_done=True, on_fail=True)
 
         # Submit job to workload manager
-        job_display_name = args.task + '_' + args.config
+        job_display_name = args.task + '_' + args.config_name
 
         if args.trial is not None:
             job_display_name = job_display_name + f'_trial_{args.trial}'

@@ -1,0 +1,4 @@
+neptune_api_key: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxNWE0MTA5OS0yNTBhLTRlYTAtYjRjMC05MmRjMWM3Njg2ZDcifQ==
+neptune_username: anicolson
+#neptune_mode: 'offline'
+wandb_api_key: c5d1fef385b4c4f19b32846f62da1674aa4091ed

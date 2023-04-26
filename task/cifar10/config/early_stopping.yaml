@@ -10,3 +10,7 @@ module: task.cifar10.model.resnet18
 definition: ResNet18
 max_epochs: 1000
 resumable: True
+
+
+early_stopping: True
+patience: 128 

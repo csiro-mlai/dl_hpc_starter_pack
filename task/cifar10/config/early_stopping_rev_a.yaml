@@ -1,7 +1,7 @@
 defaults:
   - baseline
   - ancillary/hpc_paths@_global_
-  - ancillary/1gpu@_global_
+  - ancillary/2gpu@_global_
   - ancillary/20min@_global_
   - ancillary/neptune@_global_
   - _self_
@@ -9,4 +9,8 @@ defaults:
 module: task.cifar10.model.resnet18
 definition: ResNet18
 max_epochs: 1000
-resumable: True
+
+early_stopping: True
+patience: 128 
+
+

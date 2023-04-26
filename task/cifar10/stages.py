@@ -10,7 +10,7 @@ from dlhpcstarter.utils import (
     resume_from_ckpt_path,
     write_test_ckpt_path,
 )
-import torch
+
 
 def stages(args: Namespace):
     """
@@ -54,13 +54,13 @@ def stages(args: Namespace):
         # model = torch.compile(model)
 
         # Train
-        ckpt_path = resume_from_ckpt_path(args.exp_dir_trial, args.resumable, args.resume_epoch, args.resume_ckpt_path)
+        ckpt_path = resume_from_ckpt_path(args.exp_dir_trial, args.resume_last, args.resume_epoch, args.resume_ckpt_path)
         trainer.fit(model, ckpt_path=ckpt_path)
 
     # Test
     if args.test:
 
-        if args.debug:
+        if args.fast_dev_run:
             model = TaskModel(**vars(args))
         else:
 

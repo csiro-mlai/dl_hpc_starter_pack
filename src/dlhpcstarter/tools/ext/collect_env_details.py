@@ -96,6 +96,9 @@ def nice_print(details, level=0):
 
 
 def main():
+
+    raise ValueError('collect environment details is currently not working.')
+
     details = {
         "System": info_system(),
         "CUDA": info_cuda(),
