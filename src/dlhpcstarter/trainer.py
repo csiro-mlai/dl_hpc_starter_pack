@@ -152,8 +152,12 @@ def trainer_instance(
             )
         )
         if 'strategy' in kwargs:
-            if 'deepspeed_stage_3' in kwargs['strategy']: 
-                callbacks[-1].FILE_EXTENSION = ""
+            if isinstance(kwargs['strategy'], str):
+                if 'deepspeed_stage_3' in kwargs['strategy']: 
+                    callbacks[-1].FILE_EXTENSION = ""
+            elif isinstance(kwargs['strategy'], DeepSpeedStrategy):
+                if kwargs['deepspeed_config']['stage'] == 3:
+                    callbacks[-1].FILE_EXTENSION = ""
 
     # if every_n_train_steps:
     #     if resumable:
