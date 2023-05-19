@@ -8,6 +8,7 @@ from lightning.pytorch.callbacks import (EarlyStopping, LearningRateMonitor,
 from lightning.pytorch.loggers import NeptuneLogger
 from lightning.pytorch.loggers.csv_logs import CSVLogger
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
+from lightning.pytorch.strategies import DeepSpeedStrategy
 
 logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
@@ -93,14 +94,20 @@ def trainer_instance(
     callbacks = [] if callbacks is None else callbacks
     plugins = [] if plugins is None else plugins
 
+    # Unsure if Lightning's SLURMEnvironment features fault-tolerant training:
     if submit:
-        # Unsure if Lightning's SLURMEnvironment features fault-tolerant training.
         plugins.append(SLURMEnvironment(auto_requeue=False))
 
     # Deepspeed has its own autocast capabilities:
-    if 'strategy' in kwargs and 'precision' in kwargs:
-        if 'deepspeed' in kwargs['strategy'] and kwargs['precision'] == 16:
-            raise ValueError('DeepSpeed and "precision=16" are incompatible as DeepSpeed has its own autocast functionality.')
+    # if 'strategy' in kwargs and 'precision' in kwargs:
+    #     if 'deepspeed' in kwargs['strategy'] and kwargs['precision'] == 16:
+    #         raise ValueError('DeepSpeed and "precision=16" are incompatible as DeepSpeed has its own autocast functionality.')
+
+    # DeepSpeed config:
+    if 'deepspeed_config' in kwargs:
+        kwargs['strategy'] = DeepSpeedStrategy(
+            **kwargs['deepspeed_config']
+        )
 
     # Loggers
     loggers.append(CSVLogger(exp_dir_trial))

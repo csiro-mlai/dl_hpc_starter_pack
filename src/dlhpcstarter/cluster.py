@@ -103,7 +103,7 @@ class ClusterSubmit(object):
             signal.signal(signal.SIGUSR1, self.sig_handler)
             signal.signal(signal.SIGTERM, self.term_handler)
         else:
-            print("Automatic requeuing has not been set. The job will not be requeued after timeout.")
+            print('Automatic requeuing has not been set. The job will not be requeued after timeout.')
         try:
             self.fnc(self.fnc_kwargs)
 
@@ -113,11 +113,11 @@ class ClusterSubmit(object):
             raise SystemExit
 
     def schedule_experiment(self, session):
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        timestamp = 'session_{}_{}'.format(session, timestamp)
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        timestamp = f'session_{session}_{timestamp}'
 
         # Generate and save cluster manager script
-        manager_cmd_script_path = os.path.join(self.manager_files_log_path, '{}.sh'.format(timestamp))
+        manager_cmd_script_path = os.path.join(self.manager_files_log_path, f'{timestamp}.sh')
         if self.manager == 'slurm':
             manager_cmd = self.build_slurm_command(manager_cmd_script_path, timestamp, session)
         else:
@@ -126,7 +126,7 @@ class ClusterSubmit(object):
 
         # Run script to launch job
         print('\nLaunching experiment...')
-        result = call('{} {}'.format(self.run_cmd[self.manager], manager_cmd_script_path), shell=True)
+        result = call(f'{self.run_cmd[self.manager]} {manager_cmd_script_path}', shell=True)
         if result == 0:
             print(f'Launched experiment {manager_cmd_script_path}.')
         else:
@@ -134,7 +134,7 @@ class ClusterSubmit(object):
 
     def call_resume(self):
         job_id = os.environ['SLURM_JOB_ID']
-        cmd = 'scontrol requeue {}'.format(job_id)
+        cmd = f'scontrol requeue {job_id}'
         print(f'\nRequeing job {job_id}...')
         result = call(cmd, shell=True)
         if result == 0:
@@ -144,11 +144,11 @@ class ClusterSubmit(object):
         os._exit(0)
 
     def sig_handler(self, signum, frame):
-        print(f"Caught signal: {signum}")
+        print(f'Caught signal: {signum}')
         self.call_resume()
 
     def term_handler(self, signum, frame):
-        print("Bypassing sigterm.")
+        print('Bypassing sigterm.')
 
     def save_manager_cmd(self, manager_cmd, manager_cmd_script_path):
         with open(manager_cmd_script_path, mode='w') as file:
@@ -186,29 +186,30 @@ class ClusterSubmit(object):
     def build_slurm_command(self, manager_cmd_script_path, timestamp, session):
 
         sub_commands = ['#!/bin/bash -l']
-        sub_commands.append('#SBATCH --job-name={}'.format('{}session_{}'.format(self.job_display_name, session)))
+        sub_commands.append(f'#SBATCH --job-name={self.job_display_name}session_{session}')
 
         if self.log_out:
-            out_path = os.path.join(self.out_log_path, '{}_%j.out'.format(timestamp))
-            sub_commands.append('#SBATCH --output={}'.format(out_path))
+            out_path = os.path.join(self.out_log_path, f'{timestamp}_%j.out')
+            sub_commands.append(f'#SBATCH --output={out_path}')
 
         if self.log_err:
-            err_path = os.path.join(self.err_log_path, '{}_%j.err'.format(timestamp))
-            sub_commands.append('#SBATCH --error={}'.format(err_path))
+            err_path = os.path.join(self.err_log_path, f'{timestamp}_%j.err')
+            sub_commands.append(f'#SBATCH --error={err_path}')
         sub_commands.append(f'#SBATCH --time={self.time_limit:s}')
 
-        if self.begin != "now":
-            sub_commands.append('#SBATCH --begin={}'.format(self.begin))
+        if self.begin != 'now':
+            sub_commands.append(f'#SBATCH --begin={self.begin}')
 
         if self.num_gpus:
-            sub_commands.append('#SBATCH --gres=gpu:{}'.format(self.num_gpus))
+            sub_commands.append(f'#SBATCH --gres=gpu:{self.num_gpus}')
 
         if self.num_workers > 0:
-            sub_commands.append('#SBATCH --cpus-per-task={}'.format(self.num_workers))
+            sub_commands.append(f'#SBATCH --cpus-per-task={self.num_workers}')
 
-        sub_commands.append('#SBATCH --nodes={}'.format(self.num_nodes))
-        sub_commands.append('#SBATCH --mem={}'.format(self.memory))
+        sub_commands.append(f'#SBATCH --nodes={self.num_nodes}')
+        sub_commands.append(f'#SBATCH --mem={self.memory}')
         sub_commands.append(f'#SBATCH --signal=USR1@{6 * 60}')
+        sub_commands.append(f'#SBATCH --open-mode=append')
 
         mail_type = []
         if self.notify_on_end:
@@ -216,14 +217,14 @@ class ClusterSubmit(object):
         if self.notify_on_fail:
             mail_type.append('FAIL')
         if len(mail_type) > 0 and self.email is not None:
-            sub_commands.append('#SBATCH --mail-type={}'.format(','.join(mail_type)))
-            sub_commands.append('#SBATCH --mail-user={}'.format(self.email))
+            sub_commands.append(f'#SBATCH --mail-type={",".join(mail_type)}')
+            sub_commands.append(f'#SBATCH --mail-user={self.email}')
 
         for (cmd, value) in self.manager_commands:
             if value:
-                sub_commands.append('#SBATCH --{}={}'.format(cmd, value))
+                sub_commands.append(f'#SBATCH --{cmd}={value}')
             else:
-                sub_commands.append('#SBATCH --{}'.format(cmd))
+                sub_commands.append(f'#SBATCH --{cmd}')
 
         sub_commands = [x.lstrip() for x in sub_commands]
 
@@ -231,12 +232,12 @@ class ClusterSubmit(object):
             sub_commands.append(cmd)
 
         args_string = self.args_to_string(self.fnc_kwargs)
-        args_string = '{} --{} {}'.format(args_string, "slurm_cmd_path", manager_cmd_script_path)
+        args_string = f'{args_string} --slurm_cmd_path {manager_cmd_script_path}'
 
         if self.entrypoint:
             cmd = f'{self.entrypoint} {args_string}'
         else:
-            cmd = '{} {} {}'.format(self.python_cmd, self.script_name, args_string)
+            cmd = f'{self.python_cmd} {self.script_name} {args_string}'
         if not self.no_srun:
             cmd = 'srun ' + cmd
         sub_commands.append(cmd)
@@ -248,9 +249,9 @@ class ClusterSubmit(object):
         for k, v in vars(args).items():
             if v is not None:
                 if self.escape(v):
-                    cmd = '--{} \"{}\"'.format(k, v)
+                    cmd = '--{k} \"{v}\"'
                 else:
-                    cmd = '--{} {}'.format(k, v)
+                    cmd = f'--{k} {v}'
                 params.append(cmd)
         return ' '.join(params)
 

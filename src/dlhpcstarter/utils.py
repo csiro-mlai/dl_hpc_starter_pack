@@ -1,17 +1,17 @@
-from argparse import Namespace
-from hydra import compose, initialize_config_dir
-from pathlib import Path
-from typing import Optional
 import glob
-import GPUtil
 import importlib
-import numpy as np
 import os
 import re
-
-
-import torch
 import warnings
+from argparse import Namespace
+from pathlib import Path
+from typing import Optional
+
+import GPUtil
+import numpy as np
+import pandas as pd
+import torch
+from hydra import compose, initialize_config_dir
 
 
 def importer(
@@ -270,6 +270,64 @@ def resume_from_ckpt_path(
         print('Resuming training from {}.'.format(ckpt_path))
 
     return ckpt_path
+
+
+def get_experiment_scores_csv_paths(config_name, trial, task, exp_dir, log_dir='lightning_logs'):
+    regex = os.path.join(exp_dir, task, config_name, f'trial_{trial}', log_dir, '**', '*.csv')
+    return glob.glob(regex, recursive=True)
+
+
+def read_and_concatenate_experiment_scores(config_name, trial, task, exp_dir):
+    csv_logs = get_experiment_scores_csv_paths(config_name, trial, task, exp_dir)
+    return pd.concat([pd.read_csv(f) for f in csv_logs], ignore_index=True) if csv_logs else None 
+
+
+def get_experiment_last_test_scores(config_name, trial, task, exp_dir):
+    df = read_and_concatenate_experiment_scores(config_name, trial, task, exp_dir)
+    if isinstance(df, pd.DataFrame):
+        df = df[df.columns[df.columns.str.startswith('test_')]]
+        df = df.iloc[[-1]].dropna(how='all')
+        df.insert(0, 'trial', trial) 
+        df.insert(0, 'config', config_name) 
+    return df
+
+
+def get_config_test_scores(config_trial_list, task, exp_dir):
+    df_list = []
+    for i in config_trial_list:
+        df = get_experiment_last_test_scores(i['config'], i['trial'], task, exp_dir)
+        if isinstance(df, pd.DataFrame):
+            df_list.append(df)
+    return pd.concat(df_list)
+
+
+def get_melted_config_test_scores(config_trial_list, task, exp_dir):
+    df = get_config_test_scores(config_trial_list, task, exp_dir)
+    df = df.melt(
+        id_vars=['config', 'trial'],
+        var_name='metric',
+        value_name='score',
+    )
+    return df
+
+
+def get_config_epochs_steps(config_name, trial, task, exp_dir):
+    df = read_and_concatenate_experiment_scores(config_name, trial, task, exp_dir)
+    if isinstance(df, pd.DataFrame):
+        df = df[['epoch', 'step']]
+        df.insert(0, 'trial', trial) 
+        df.insert(0, 'config', config_name) 
+    return df
+
+
+def get_config_max_epochs(config_trial_list, task, exp_dir):
+    df_list = []
+    for i in config_trial_list:
+        df = get_config_epochs_steps(i['config'], i['trial'], task, exp_dir)
+        if isinstance(df, pd.DataFrame):
+            df_list.append(df)
+    df = pd.concat(df_list).reset_index()
+    return df.loc[df.groupby(['config', 'trial'])['step'].idxmax()].reset_index(drop=True)
 
 
 def gpu_usage_and_visibility(cuda_visible_devices: Optional[str] = None, submit: bool = False):
