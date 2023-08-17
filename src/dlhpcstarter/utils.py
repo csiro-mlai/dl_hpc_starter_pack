@@ -1,3 +1,4 @@
+import datetime
 import glob
 import importlib
 import os
@@ -5,7 +6,7 @@ import re
 import warnings
 from argparse import Namespace
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Pattern, Union
 
 import GPUtil
 import numpy as np
@@ -60,6 +61,7 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
         print_args - print the arguments for the job.
     """
     # Add the working directory to paths:
+    args.work_dir = args.work_dir if 'work_dir' in args else None
     if not args.work_dir:
         args.work_dir = os.getcwd()
 
@@ -272,18 +274,49 @@ def resume_from_ckpt_path(
     return ckpt_path
 
 
-def get_experiment_scores_csv_paths(config_name, trial, task, exp_dir, log_dir='lightning_logs'):
-    regex = os.path.join(exp_dir, task, config_name, f'trial_{trial}', log_dir, '**', '*.csv')
-    return glob.glob(regex, recursive=True)
+def get_experiment_scores_csv_paths(
+        config_name: str, 
+        trial: Union[str, int], 
+        task: str, 
+        exp_dir: str, 
+        log_dir: str = 'lightning_logs', 
+        glob_filter: str = '**/*.csv', 
+        start_cutoff_date: Optional[datetime.datetime] = None,
+        end_cutoff_date: Optional[datetime.datetime] = None,
+        date_regex: Pattern[str] = r'([0-9]{2}\-[0-9]{2}\-[0-9]{4}\_[0-9]{2}\-[0-9]{2}\-[0-9]{2})',
+        strptime_format: str = '%d-%m-%Y_%H-%M-%S',
+        trial_prefix: str = 'trial_' 
+    ):
+    regex = os.path.join(exp_dir, task, config_name, f'{trial_prefix}{trial}', log_dir, glob_filter)
+    csv_logs = glob.glob(regex, recursive=True)
+
+    if len(csv_logs) == 0:
+        warnings.warn(f'No files found for {regex}.')
+    else:
+        datetime_list = []
+        for i in csv_logs:
+            if bool(re.search(date_regex, i)):     
+                datetime_list.append(datetime.datetime.strptime(re.search(date_regex, i)[1], strptime_format))
+            else:
+                datetime_list.append(datetime.datetime.fromtimestamp(os.path.getctime(i)))
+
+        if start_cutoff_date:
+            csv_logs = [i for i, j in zip(csv_logs, datetime_list) if j > start_cutoff_date]
+            datetime_list = [i for i in datetime_list if i > start_cutoff_date]  # Remove here for end_cuttoff_date.
+
+        if end_cutoff_date:
+            csv_logs = [i for i in csv_logs if datetime.datetime.fromtimestamp(os.path.getctime(i)) < end_cutoff_date]
+
+    return csv_logs
 
 
-def read_and_concatenate_experiment_scores(config_name, trial, task, exp_dir):
-    csv_logs = get_experiment_scores_csv_paths(config_name, trial, task, exp_dir)
+def read_and_concatenate_experiment_scores(config_name, trial, **kwargs):
+    csv_logs = get_experiment_scores_csv_paths(config_name=config_name, trial=trial, **kwargs)
     return pd.concat([pd.read_csv(f) for f in csv_logs], ignore_index=True) if csv_logs else None 
 
 
-def get_experiment_last_test_scores(config_name, trial, task, exp_dir):
-    df = read_and_concatenate_experiment_scores(config_name, trial, task, exp_dir)
+def get_experiment_last_test_scores(config_name, trial, **kwargs):
+    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
     if isinstance(df, pd.DataFrame):
         df = df[df.columns[df.columns.str.startswith('test_')]]
         df = df.iloc[[-1]].dropna(how='all')
@@ -292,17 +325,17 @@ def get_experiment_last_test_scores(config_name, trial, task, exp_dir):
     return df
 
 
-def get_config_test_scores(config_trial_list, task, exp_dir):
+def get_config_test_scores(config_trial_list, **kwargs):
     df_list = []
     for i in config_trial_list:
-        df = get_experiment_last_test_scores(i['config'], i['trial'], task, exp_dir)
+        df = get_experiment_last_test_scores(config_name=i['config'], trial=i['trial'], **kwargs)
         if isinstance(df, pd.DataFrame):
             df_list.append(df)
     return pd.concat(df_list)
 
 
-def get_melted_config_test_scores(config_trial_list, task, exp_dir):
-    df = get_config_test_scores(config_trial_list, task, exp_dir)
+def get_melted_config_test_scores(**kwargs):
+    df = get_config_test_scores(**kwargs)
     df = df.melt(
         id_vars=['config', 'trial'],
         var_name='metric',
@@ -311,8 +344,8 @@ def get_melted_config_test_scores(config_trial_list, task, exp_dir):
     return df
 
 
-def get_config_epochs_steps(config_name, trial, task, exp_dir):
-    df = read_and_concatenate_experiment_scores(config_name, trial, task, exp_dir)
+def get_config_epochs_steps(config_name, trial, **kwargs):
+    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
     if isinstance(df, pd.DataFrame):
         df = df[['epoch', 'step']]
         df.insert(0, 'trial', trial) 
@@ -320,10 +353,10 @@ def get_config_epochs_steps(config_name, trial, task, exp_dir):
     return df
 
 
-def get_config_max_epochs(config_trial_list, task, exp_dir):
+def get_config_max_epochs(config_trial_list, **kwargs):
     df_list = []
     for i in config_trial_list:
-        df = get_config_epochs_steps(i['config'], i['trial'], task, exp_dir)
+        df = get_config_epochs_steps(config_name=i['config'], trial=i['trial'], **kwargs)
         if isinstance(df, pd.DataFrame):
             df_list.append(df)
     df = pd.concat(df_list).reset_index()

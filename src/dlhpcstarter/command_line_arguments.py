@@ -83,6 +83,7 @@ def read_command_line_arguments():
     cluster.add_argument('--memory', type=str, help='Amount of memory per node')
     cluster.add_argument('--time-limit', '--time_limit', type=str, help='Job time limit')
     cluster.add_argument('--submit',  default=None, action='store_true', help='Submit job to the cluster manager')
+    cluster.add_argument('--no-resubmit', '--no_resubmit', default=False, action='store_true', help='Prevents the cluster manager from resubmitting if not complete')
     cluster.add_argument('--qos', type=str, help='Quality of service')
     cluster.add_argument('--begin', type=str, help='When to begin the Slurm job, e.g. now+1hour')
     cluster.add_argument('--slurm-cmd-path', '--slurm_cmd_path', type=str)
