@@ -70,7 +70,7 @@ def read_command_line_arguments():
 
     # PyTorch Lightning Trainer arguments
     trainer = parser.add_argument_group('PyTorch Lightning Trainer arguments')
-    training_arguments.add_argument('--fast-dev-run', '--fast_dev_run',  default=None, action='store_true', help='https://lightning.ai/docs/pytorch/stable/common/trainer.html#fast-dev-run')
+    trainer.add_argument('--fast-dev-run', '--fast_dev_run',  default=None, action='store_true', help='https://lightning.ai/docs/pytorch/stable/common/trainer.html#fast-dev-run')
 
     # Distributed computing arguments
     distributed = parser.add_argument_group('Distributed computing arguments')
@@ -88,6 +88,7 @@ def read_command_line_arguments():
     cluster.add_argument('--begin', type=str, help='When to begin the Slurm job, e.g. now+1hour')
     cluster.add_argument('--slurm-cmd-path', '--slurm_cmd_path', type=str)
     cluster.add_argument('--email', type=str, help='Email for cluster manager notifications')
+    cluster.add_argument('--cpus-per-task', '--cpus_per_task', default=False, action='store_true', help='Allow --cpus-per-task option to be used')
 
     # System arguments
     system = parser.add_argument_group('System arguments')

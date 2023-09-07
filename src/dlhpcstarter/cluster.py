@@ -20,14 +20,15 @@ class ClusterSubmit(object):
             log_err: bool = True,
             log_out: bool = True,
             manager: str = 'slurm',
-            time_limit: str = '02:00:00',
-            begin: str = 'now',
-            num_gpus: int = 0,
-            num_nodes: int = 1,
-            num_workers: int = 1,
-            memory: str = '16GB',
+            time_limit: Optional[str] = None,
+            begin: Optional[str] = None,
+            num_gpus: Optional[int] = None,
+            num_nodes: Optional[int] = None,
+            num_workers: Optional[int] = None,
+            memory: Optional[str] = None,
             no_srun: bool = False,
-            python_cmd: str = 'python3',
+            cpus_per_task: bool = True,
+            python_cmd: str = 'python',
             entrypoint: Optional[str] = None,
             resubmit: bool = True,
     ):
@@ -63,6 +64,7 @@ class ClusterSubmit(object):
         self.num_workers = num_workers
         self.memory = memory
         self.no_srun = no_srun
+        self.cpus_per_task = cpus_per_task
         self.python_cmd = python_cmd
         self.entrypoint = entrypoint
         self.resubmit = resubmit
@@ -75,7 +77,7 @@ class ClusterSubmit(object):
             'slurm': 'sbatch',
         }
 
-        self.is_from_manager_object = bool(vars(fnc_kwargs)["slurm_cmd_path"])
+        self.is_from_manager_object = bool(vars(fnc_kwargs)['slurm_cmd_path'])
 
     def add_manager_cmd(self, cmd=None, value=None):
         self.manager_commands.append((cmd, value))
@@ -195,7 +197,9 @@ class ClusterSubmit(object):
         if self.log_err:
             err_path = os.path.join(self.err_log_path, f'{timestamp}_%j.err')
             sub_commands.append(f'#SBATCH --error={err_path}')
-        sub_commands.append(f'#SBATCH --time={self.time_limit:s}')
+
+        if self.time_limit:
+            sub_commands.append(f'#SBATCH --time={self.time_limit:s}')
 
         if self.begin != 'now':
             sub_commands.append(f'#SBATCH --begin={self.begin}')
@@ -203,11 +207,15 @@ class ClusterSubmit(object):
         if self.num_gpus:
             sub_commands.append(f'#SBATCH --gres=gpu:{self.num_gpus}')
 
-        if self.num_workers > 0:
+        if self.cpus_per_task:
             sub_commands.append(f'#SBATCH --cpus-per-task={self.num_workers}')
 
-        sub_commands.append(f'#SBATCH --nodes={self.num_nodes}')
-        sub_commands.append(f'#SBATCH --mem={self.memory}')
+        if self.num_nodes:
+            sub_commands.append(f'#SBATCH --nodes={self.num_nodes}')
+
+        if self.memory:
+            sub_commands.append(f'#SBATCH --mem={self.memory}')
+
         sub_commands.append(f'#SBATCH --signal=USR1@{6 * 60}')
         sub_commands.append(f'#SBATCH --open-mode=append')
 

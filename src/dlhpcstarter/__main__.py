@@ -83,6 +83,7 @@ def submit(stages_fnc: Callable, args: Namespace):
             python_cmd='python3' if not hasattr(args, 'python_cmd') else args.python_cmd,
             entrypoint='dlhpcstarter' if not hasattr(args, 'entrypoint') else args.entrypoint,
             resubmit=not args.no_resubmit,
+            cpus_per_task=args.cpus_per_task,
         )
 
         # Cluster commands
