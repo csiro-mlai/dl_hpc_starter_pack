@@ -213,6 +213,8 @@ def trainer_instance(
     kwargs = {k: v for k, v in kwargs.items() if k in inspect.signature(Trainer).parameters}
 
     # lightning.pytorch.Trainer
+    print(f'PTL no. devices: {devices}.')
+    print(f'PTL no. nodes: {num_nodes}.')
     return Trainer(
         default_root_dir=exp_dir_trial, # Needed for hpc_ckpt save path. 
         logger=loggers,

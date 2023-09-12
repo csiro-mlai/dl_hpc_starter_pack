@@ -21,7 +21,7 @@ def main() -> None:
     """    
     1. Get command line arguments using argparse for the job:
     """
-    args = read_command_line_arguments()
+    cmd_line_args = read_command_line_arguments()
 
     """
     2. Import the 'stages' function for the task:
@@ -36,9 +36,9 @@ def main() -> None:
         For example: stages() in task.cifar10.stages 
     
     """
-    args.stages_definition = 'stages' if args.stages_definition is None else args.stages_definition
-    assert args.stages_module, f'"stages_module" must be specified as a command line argument.'
-    stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
+    cmd_line_args.stages_definition = 'stages' if cmd_line_args.stages_definition is None else cmd_line_args.stages_definition
+    cmd_line_args.stages_module = 'stages_module' if cmd_line_args.stages_module is None else cmd_line_args.stages_module
+    stages_fnc = importer(definition=cmd_line_args.stages_definition, module=cmd_line_args.stages_module)
 
     """
     3. Load the configuration for the job and add it to 'args':
@@ -46,23 +46,11 @@ def main() -> None:
         This contains the paths, model configuration, the training and test configuration, the device & cluster manager 
         configuration.
     """
-    load_config_and_update_args(args=args, print_args=True)
+    args, cmd_line_args = load_config_and_update_args(cmd_line_args=cmd_line_args)
 
     """
     4. Submit the job to the cluster manager (or run locally if args.submit = False).
     """
-    submit(args=args, stages_fnc=stages_fnc)
-
-
-def submit(stages_fnc: Callable, args: Namespace):
-    """
-    Submit the job to the cluster manager, e.g., SLURM, or run the job locally, i.e., args.submit = False.
-
-    Argument/s:
-        stages_fnc - function that handles the creation, training, and testing of a model.
-        args - arguments containing the configuration for the job and the model
-    """
-
     if not args.submit:
 
         # Run locally
@@ -72,7 +60,7 @@ def submit(stages_fnc: Callable, args: Namespace):
 
         # Cluster object
         cluster = ClusterSubmit(
-            fnc_kwargs=args,
+            args=args,
             fnc=stages_fnc,
             save_dir=args.exp_dir_trial,
             time_limit=args.time_limit,
@@ -82,12 +70,15 @@ def submit(stages_fnc: Callable, args: Namespace):
             memory=args.memory,
             python_cmd='python3' if not hasattr(args, 'python_cmd') else args.python_cmd,
             entrypoint='dlhpcstarter' if not hasattr(args, 'entrypoint') else args.entrypoint,
-            resubmit=not args.no_resubmit,
-            cpus_per_task=args.cpus_per_task,
+            no_cpus_per_task=args.no_cpus_per_task,
+            no_gpus_per_node=args.no_gpus_per_node,
+            no_ntasks_per_node=args.no_ntasks_per_node,
+            srun_options=args.srun_options,
+            email=args.email, 
+            email_on_complete=True, 
+            email_on_fail=True,
+            cmd_line_args=cmd_line_args,
         )
-
-        # Cluster commands
-        cluster.add_manager_cmd(cmd='ntasks-per-node', value=args.devices if args.devices else 1)
 
         # Source virtual environment
         cluster.add_command('source ' + args.venv_path)
@@ -96,22 +87,19 @@ def submit(stages_fnc: Callable, args: Namespace):
         cluster.add_command('export NCCL_DEBUG=INFO')
         cluster.add_command('export PYTHONFAULTHANDLER=1')
 
-        # Add commands to the cluster manager submission script
+        # Add options to the cluster manager submission script
         if 'cluster_manager_script_commands' in args:
             for i in args.cluster_manager_script_commands:
                 cluster.add_command(i)
 
-        # Add cluster manager commands
-        if 'cluster_manager_commands' in args:
-            for i in args.cluster_manager_commands:
-                cluster.add_manager_cmd(cmd=i[0], value=i[1])
+        # Add cluster manager options
+        if 'cluster_manager_options' in args:
+            for i in args.cluster_manager_options:
+                cluster.add_manager_option(option=i[0], value=i[1])
 
         # Request the quality of service for the job
         if args.qos:
-            cluster.add_manager_cmd(cmd='qos', value=args.qos)
-
-        # Email job status
-        cluster.notify_job_status(email=args.email, on_done=True, on_fail=True)
+            cluster.add_manager_option(cmd='qos', value=args.qos)
 
         # Submit job to workload manager
         job_display_name = args.task + '_' + args.config_name

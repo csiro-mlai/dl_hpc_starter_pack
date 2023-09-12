@@ -83,12 +83,14 @@ def read_command_line_arguments():
     cluster.add_argument('--memory', type=str, help='Amount of memory per node')
     cluster.add_argument('--time-limit', '--time_limit', type=str, help='Job time limit')
     cluster.add_argument('--submit',  default=None, action='store_true', help='Submit job to the cluster manager')
-    cluster.add_argument('--no-resubmit', '--no_resubmit', default=False, action='store_true', help='Prevents the cluster manager from resubmitting if not complete')
     cluster.add_argument('--qos', type=str, help='Quality of service')
     cluster.add_argument('--begin', type=str, help='When to begin the Slurm job, e.g. now+1hour')
-    cluster.add_argument('--slurm-cmd-path', '--slurm_cmd_path', type=str)
+    cluster.add_argument('--manager-script-path', '--manager_script_path', type=str)
+    cluster.add_argument('--srun_options', '--srun-options', type=str, help='Options for srun')
     cluster.add_argument('--email', type=str, help='Email for cluster manager notifications')
-    cluster.add_argument('--cpus-per-task', '--cpus_per_task', default=False, action='store_true', help='Allow --cpus-per-task option to be used')
+    cluster.add_argument('--no-cpus-per-task', '--no_cpus_per_task', default=None, action='store_true', help='Prevent the --cpus-per-task option from being placed in the Slurm script')
+    cluster.add_argument('--no-gpus-per-node', '--no_gpus_per_node', default=None, action='store_true', help='Prevent the --gpus-per-node option from being placed in the Slurm script')
+    cluster.add_argument('--no-ntasks-per-node', '--no_ntasks_per_node', default=None, action='store_true', help='Prevent the --no-ntasks-per-node option from being placed in the Slurm script')
 
     # System arguments
     system = parser.add_argument_group('System arguments')

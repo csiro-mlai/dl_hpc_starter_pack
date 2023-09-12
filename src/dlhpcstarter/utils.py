@@ -1,3 +1,4 @@
+import copy
 import datetime
 import glob
 import importlib
@@ -52,14 +53,17 @@ def importer(
     return getattr(module, definition)
 
 
-def load_config_and_update_args(args: Namespace, print_args: bool = False) -> None:
+def load_config_and_update_args(cmd_line_args: Namespace, print_args: bool = False) -> None:
     """
     Loads the configuration .yaml file and updates the args object.
 
     Argument/s:
-        args - object that houses the arguments for the job.
+        cmd_line_args - command line arguments object.
         print_args - print the arguments for the job.
     """
+    # Make a deepcopy of the command line arguments:
+    args = copy.deepcopy(cmd_line_args)
+
     # Add the working directory to paths:
     args.work_dir = args.work_dir if 'work_dir' in args else None
     if not args.work_dir:
@@ -99,9 +103,6 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
     # Defaults: There is probably a better place to do this:
     args.num_workers = args.num_workers if args.num_workers is not None else 1
     args.num_nodes = args.num_nodes if args.num_nodes is not None else 1
-    if args.submit:
-        args.time_limit = args.time_limit if args.time_limit is not None else '02:00:00'
-        args.memory = args.memory if args.memory is not None else '16GB'
 
     # Add the task, configuration name, and the trial number to the experiment directory:
     args.trial = args.trial if args.trial is not None else 0
@@ -116,6 +117,8 @@ def load_config_and_update_args(args: Namespace, print_args: bool = False) -> No
 
     # Print GPU usage and set GPU visibility:
     gpu_usage_and_visibility(args.cuda_visible_devices, args.submit)
+
+    return args, cmd_line_args
 
 
 def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int, extension: str = ".ckpt") -> str:

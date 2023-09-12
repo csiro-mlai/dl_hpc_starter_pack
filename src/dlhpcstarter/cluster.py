@@ -1,11 +1,17 @@
-from argparse import Namespace
-from subprocess import call
-from typing import Callable, Optional
 import datetime
 import os
+import re
 import signal
 import sys
 import traceback
+from argparse import Namespace
+from pathlib import Path
+from subprocess import call
+from typing import Any, Callable, Optional
+
+import yaml
+from munch import DefaultMunch
+from omegaconf import OmegaConf
 
 
 class ClusterSubmit(object):
@@ -15,8 +21,9 @@ class ClusterSubmit(object):
     def __init__(
             self,
             fnc: Callable,
-            fnc_kwargs: Namespace,
+            args: Namespace,
             save_dir: str,
+            cmd_line_args: Any = {},
             log_err: bool = True,
             log_out: bool = True,
             manager: str = 'slurm',
@@ -27,15 +34,21 @@ class ClusterSubmit(object):
             num_workers: Optional[int] = None,
             memory: Optional[str] = None,
             no_srun: bool = False,
-            cpus_per_task: bool = True,
+            no_cpus_per_task: bool = False,
+            no_gpus_per_node: bool = False,
+            no_ntasks_per_node: bool = False,
             python_cmd: str = 'python',
             entrypoint: Optional[str] = None,
-            resubmit: bool = True,
+            srun_options: str = '',
+            email: Optional[str] = None,
+            email_on_complete: bool = True,
+            email_on_fail: bool = True,
     ):
         """
         Argument/s:
             fnc - function for the job.
-            fnc_kwargs - keyword arguments for the function.
+            args - arguments for the job.
+            cmd_line_args - command line arguments for the cluster manager script.
             save_dir -  directory where the cluster manager script, stdout, and stderr are saved.
             log_err - log standard error.
             log_out - log standard output.
@@ -47,12 +60,19 @@ class ClusterSubmit(object):
             num_workers - number of workers per GPU.
             memory - minimum memory amount.
             no_srun - don't use 'srun'.
+            no_cpus_per_task - prevent the --cpus-per-task option from being placed in the Slurm script. 
+            no_gpus_per_node - prevent the --gpus-per-node option from being placed in the Slurm script. 
+            no_ntasks_per_node - prevent the --ntasks-per-node option from being placed in the Slurm script. 
             python_cmd - python command name.
             entrypoint - entrypoint to use instead of a script.
-            resubmit - automatically resubmit job just before timout.
+            srun_options - options for srun.
+            email - email address for job notifications.
+            email_on_complete - send notification via email on job completion.
+            email_on_fail - send notification via email on job fail.
         """
         self.fnc = fnc
-        self.fnc_kwargs = fnc_kwargs
+        self.args = args
+        self.cmd_line_args = cmd_line_args if isinstance(cmd_line_args, dict) else vars(cmd_line_args)
         self.exp_dir = save_dir
         self.log_err = log_err
         self.log_out = log_out
@@ -64,206 +84,203 @@ class ClusterSubmit(object):
         self.num_workers = num_workers
         self.memory = memory
         self.no_srun = no_srun
-        self.cpus_per_task = cpus_per_task
+        self.no_cpus_per_task = no_cpus_per_task
+        self.no_gpus_per_node = no_gpus_per_node
+        self.no_ntasks_per_node = no_ntasks_per_node
         self.python_cmd = python_cmd
         self.entrypoint = entrypoint
-        self.resubmit = resubmit
+        self.srun_options = srun_options
+        self.email = email
+        self.email_on_complete = email_on_complete
+        self.email_on_fail = email_on_fail
 
         self.script_name = os.path.realpath(sys.argv[0])
-        self.manager_commands = []
+        self.manager_options = []
         self.commands = []
 
-        self.run_cmd = {
-            'slurm': 'sbatch',
-        }
+        self.run_cmd = {'slurm': 'sbatch'}
 
-        self.is_from_manager_object = bool(vars(fnc_kwargs)['slurm_cmd_path'])
+        self.manager_script_path = self.args.manager_script_path
+        self.is_from_manager_object = bool(self.manager_script_path)
 
-    def add_manager_cmd(self, cmd=None, value=None):
-        self.manager_commands.append((cmd, value))
+    def add_manager_option(self, option=None, value=None):
+        self.manager_options.append((option, value))
 
     def add_command(self, cmd):
         self.commands.append(cmd)
 
-    def notify_job_status(self, email, on_done, on_fail):
-        self.email = email
-        self.notify_on_end = on_done
-        self.notify_on_fail = on_fail
-
     def submit(self, job_display_name=None):
         self.job_display_name = job_display_name
-        self.log_dir()
+
+        manager_script_dir = os.path.join(self.exp_dir, 'manager_scripts')
+        args_dir = os.path.join(self.exp_dir, 'arguments')
+
+        Path(self.exp_dir).mkdir(parents=True, exist_ok=True)
+        Path(manager_script_dir).mkdir(parents=True, exist_ok=True)
+        Path(args_dir).mkdir(parents=True, exist_ok=True)
+        if self.log_err:
+            self.err_log_path = os.path.join(self.exp_dir, 'error_logs')
+            Path(self.err_log_path).mkdir(parents=True, exist_ok=True)
+        if self.log_out:
+            self.out_log_path = os.path.join(self.exp_dir, 'out_logs')
+            Path(self.out_log_path).mkdir(parents=True, exist_ok=True)
+
         if self.is_from_manager_object:
-            self.run()
+
+            try:
+
+                print('Setting signal to automatically requeue the job before timeout.')
+                signal.signal(signal.SIGUSR1, self.sig_handler)
+                signal.signal(signal.SIGTERM, self.term_handler)
+
+                # Load arguments for session:
+                session = re.search(r'\/session_(\d+)', self.manager_script_path).group(1)
+                args_path = os.path.join(self.exp_dir, 'arguments', f'session_{session}.yaml')
+                with open(args_path, 'r') as f:
+                    args = yaml.safe_load(f)
+                    args = DefaultMunch.fromDict(args)
+                
+                self.fnc(args)
+
+            except Exception as e:
+                print('Caught exception in worker thread', e)
+                traceback.print_exc()
+                raise SystemExit
+
         else:
             scripts_path = os.path.join(self.exp_dir, 'manager_scripts')
-            self.schedule_experiment(self.get_max_session_number(scripts_path))
 
-    def run(self):
-        if self.resubmit:
-            print('Setting signal to automatically requeue the job before timeout.')
-            signal.signal(signal.SIGUSR1, self.sig_handler)
-            signal.signal(signal.SIGTERM, self.term_handler)
-        else:
-            print('Automatic requeuing has not been set. The job will not be requeued after timeout.')
-        try:
-            self.fnc(self.fnc_kwargs)
+            # Get max session number:
+            files = os.listdir(scripts_path)
+            session_files = [f for f in files if 'session_' in f]
+            session = 0
+            if len(session_files) > 0:
+                sessions = [int(f_name.split('_')[1]) for f_name in session_files]
+                max_session = max(sessions)
+                session = max_session + 1
 
-        except Exception as e:
-            print('Caught exception in worker thread', e)
-            traceback.print_exc()
-            raise SystemExit
+            timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            timestamp = f'session_{session}_{timestamp}'
 
-    def schedule_experiment(self, session):
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        timestamp = f'session_{session}_{timestamp}'
+            # Generate and save cluster manager script:
+            manager_script_path = os.path.join(manager_script_dir, f'{timestamp}.sh')
+            if self.manager == 'slurm':
+                manager_script = self.create_slurm_script(manager_script_path, timestamp, session)
+            else:
+                raise ValueError(f'{self.manager} is not a valid manager.')
+            with open(manager_script_path, mode='w') as file:
+                file.write(manager_script)
 
-        # Generate and save cluster manager script
-        manager_cmd_script_path = os.path.join(self.manager_files_log_path, f'{timestamp}.sh')
-        if self.manager == 'slurm':
-            manager_cmd = self.build_slurm_command(manager_cmd_script_path, timestamp, session)
-        else:
-            raise ValueError(f'{self.manager} is not a valid manager.')
-        self.save_manager_cmd(manager_cmd, manager_cmd_script_path)
+            # Save arguments for session:
+            args_path = os.path.join(args_dir, f'session_{session}.yaml')
+            with open(args_path, 'w') as f:
+                OmegaConf.save(vars(self.args), f)
 
-        # Run script to launch job
-        print('\nLaunching experiment...')
-        result = call(f'{self.run_cmd[self.manager]} {manager_cmd_script_path}', shell=True)
-        if result == 0:
-            print(f'Launched experiment {manager_cmd_script_path}.')
-        else:
-            print('Launch failed...')
+            # Run script to launch job
+            print('\nLaunching experiment...')
+            result = call(f'{self.run_cmd[self.manager]} {manager_script_path}', shell=True)
+            if result == 0:
+                print(f'Launched experiment {manager_script_path}.')
+            else:
+                print('Launch failed...')
 
-    def call_resume(self):
+    def sig_handler(self, signum, frame):
+
+        print(f'Caught signal: {signum}')
+
         job_id = os.environ['SLURM_JOB_ID']
         cmd = f'scontrol requeue {job_id}'
+
         print(f'\nRequeing job {job_id}...')
         result = call(cmd, shell=True)
+        
         if result == 0:
             print(f'Requeued job {job_id}.')
         else:
             print('Requeue failed...')
         os._exit(0)
 
-    def sig_handler(self, signum, frame):
-        print(f'Caught signal: {signum}')
-        self.call_resume()
-
     def term_handler(self, signum, frame):
         print('Bypassing sigterm.')
 
-    def save_manager_cmd(self, manager_cmd, manager_cmd_script_path):
-        with open(manager_cmd_script_path, mode='w') as file:
-            file.write(manager_cmd)
+    def create_slurm_script(self, manager_script_path, timestamp, session):
 
-    def get_max_session_number(self, path):
-        files = os.listdir(path)
-        session_files = [f for f in files if 'session_' in f]
-        if len(session_files) > 0:
-            sessions = [int(f_name.split('_')[1]) for f_name in session_files]
-            max_session = max(sessions)
-            return max_session + 1
-        else:
-            return 0
-
-    def log_dir(self):
-        out_path = os.path.join(self.exp_dir)
-        self.exp_dir = out_path
-        if not os.path.exists(out_path):
-            os.makedirs(out_path)
-        self.manager_files_log_path = os.path.join(out_path, 'manager_scripts')
-        if not os.path.exists(self.manager_files_log_path):
-            os.makedirs(self.manager_files_log_path)
-        if self.log_err:
-            err_path = os.path.join(out_path, 'error_logs')
-            if not os.path.exists(err_path):
-                os.makedirs(err_path)
-            self.err_log_path = err_path
-        if self.log_out:
-            out_path = os.path.join(out_path, 'out_logs')
-            if not os.path.exists(out_path):
-                os.makedirs(out_path)
-            self.out_log_path = out_path
-
-    def build_slurm_command(self, manager_cmd_script_path, timestamp, session):
-
-        sub_commands = ['#!/bin/bash -l']
-        sub_commands.append(f'#SBATCH --job-name={self.job_display_name}session_{session}')
+        script = ['#!/bin/bash -l']
+        script.append(f'#SBATCH --job-name={self.job_display_name}session_{session}')
 
         if self.log_out:
             out_path = os.path.join(self.out_log_path, f'{timestamp}_%j.out')
-            sub_commands.append(f'#SBATCH --output={out_path}')
+            script.append(f'#SBATCH --output={out_path}')
 
         if self.log_err:
             err_path = os.path.join(self.err_log_path, f'{timestamp}_%j.err')
-            sub_commands.append(f'#SBATCH --error={err_path}')
+            script.append(f'#SBATCH --error={err_path}')
 
         if self.time_limit:
-            sub_commands.append(f'#SBATCH --time={self.time_limit:s}')
+            script.append(f'#SBATCH --time={self.time_limit:s}')
 
-        if self.begin != 'now':
-            sub_commands.append(f'#SBATCH --begin={self.begin}')
+        if self.begin:
+            script.append(f'#SBATCH --begin={self.begin}')
 
-        if self.num_gpus:
-            sub_commands.append(f'#SBATCH --gres=gpu:{self.num_gpus}')
+        if not self.no_gpus_per_node and self.num_gpus:
+            script.append(f'#SBATCH --gpus-per-node={self.num_gpus}')
 
-        if self.cpus_per_task:
-            sub_commands.append(f'#SBATCH --cpus-per-task={self.num_workers}')
+        if not self.no_ntasks_per_node and self.num_gpus:
+            script.append(f'#SBATCH --ntasks-per-node={self.num_gpus}')
+
+        if not self.no_cpus_per_task and self.num_workers > 1:
+            script.append(f'#SBATCH --cpus-per-task={self.num_workers}')
 
         if self.num_nodes:
-            sub_commands.append(f'#SBATCH --nodes={self.num_nodes}')
+            script.append(f'#SBATCH --nodes={self.num_nodes}')
 
         if self.memory:
-            sub_commands.append(f'#SBATCH --mem={self.memory}')
+            script.append(f'#SBATCH --mem={self.memory}')
 
-        sub_commands.append(f'#SBATCH --signal=USR1@{6 * 60}')
-        sub_commands.append(f'#SBATCH --open-mode=append')
+        script.append(f'#SBATCH --signal=USR1@{6 * 60}')
+        script.append(f'#SBATCH --open-mode=append')
 
         mail_type = []
-        if self.notify_on_end:
+        if self.email_on_complete:
             mail_type.append('END')
-        if self.notify_on_fail:
+        if self.email_on_fail:
             mail_type.append('FAIL')
         if len(mail_type) > 0 and self.email is not None:
-            sub_commands.append(f'#SBATCH --mail-type={",".join(mail_type)}')
-            sub_commands.append(f'#SBATCH --mail-user={self.email}')
+            script.append(f'#SBATCH --mail-type={",".join(mail_type)}')
+            script.append(f'#SBATCH --mail-user={self.email}')
 
-        for (cmd, value) in self.manager_commands:
+        for (option, value) in self.manager_options:
             if value:
-                sub_commands.append(f'#SBATCH --{cmd}={value}')
+                script.append(f'#SBATCH --{option}={value}')
             else:
-                sub_commands.append(f'#SBATCH --{cmd}')
+                script.append(f'#SBATCH --{option}')
 
-        sub_commands = [x.lstrip() for x in sub_commands]
+        script = [x.lstrip() for x in script]
 
         for cmd in self.commands:
-            sub_commands.append(cmd)
+            script.append(cmd)
 
-        args_string = self.args_to_string(self.fnc_kwargs)
-        args_string = f'{args_string} --slurm_cmd_path {manager_cmd_script_path}'
+        cmd_line_args = []
+        for k, v in self.cmd_line_args.items():
+            if v is not None:
+                v_str = str(v)
+                if '[' in v_str or ';' in v_str or ' ' in v_str:
+                    option = f'--{k} \"{v}\"'
+                else:
+                    option = f'--{k} {v}'
+                cmd_line_args.append(option)
+        cmd_line_args = ' '.join(cmd_line_args)
+
+        cmd_line_args = f'{cmd_line_args} --manager_script_path {manager_script_path}'
 
         if self.entrypoint:
-            cmd = f'{self.entrypoint} {args_string}'
+            cmd = f'{self.entrypoint} {cmd_line_args}'
         else:
-            cmd = f'{self.python_cmd} {self.script_name} {args_string}'
+            cmd = f'{self.python_cmd} {self.script_name} {cmd_line_args}'
         if not self.no_srun:
+            cmd = self.srun_options + ' ' + cmd if self.srun_options else cmd
             cmd = 'srun ' + cmd
-        sub_commands.append(cmd)
+        script.append(cmd)
 
-        return '\n'.join(sub_commands)
-
-    def args_to_string(self, args):
-        params = []
-        for k, v in vars(args).items():
-            if v is not None:
-                if self.escape(v):
-                    cmd = '--{k} \"{v}\"'
-                else:
-                    cmd = f'--{k} {v}'
-                params.append(cmd)
-        return ' '.join(params)
-
-    def escape(self, v):
-        v = str(v)
-        return '[' in v or ';' in v or ' ' in v
+        return '\n'.join(script)
     
