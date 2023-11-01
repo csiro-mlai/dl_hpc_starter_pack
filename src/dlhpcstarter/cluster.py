@@ -43,6 +43,9 @@ class ClusterSubmit(object):
             email: Optional[str] = None,
             email_on_complete: bool = True,
             email_on_fail: bool = True,
+            auto_resubmit: bool = True,
+            auto_resubmit_method: str = 'signal',
+            timeout_time_limit: str = None,
     ):
         """
         Argument/s:
@@ -69,6 +72,9 @@ class ClusterSubmit(object):
             email - email address for job notifications.
             email_on_complete - send notification via email on job completion.
             email_on_fail - send notification via email on job fail.
+            auto_resubmit - flag for automatically resubmitting to the cluster.
+            auto_resubmit_method - method of automatically resubmitting job to queue.
+            timeout_time_limit - timeout time limit.
         """
         self.fnc = fnc
         self.args = args
@@ -93,10 +99,16 @@ class ClusterSubmit(object):
         self.email = email
         self.email_on_complete = email_on_complete
         self.email_on_fail = email_on_fail
+        self.auto_resubmit = auto_resubmit
+        self.auto_resubmit_method = auto_resubmit_method
+        self.timeout_time_limit = timeout_time_limit
+
+        self.auto_resubmit_method = self.auto_resubmit_method if self.auto_resubmit else None 
 
         self.script_name = os.path.realpath(sys.argv[0])
         self.manager_options = []
         self.commands = []
+        self.clean_up_commands = []
 
         self.run_cmd = {'slurm': 'sbatch'}
 
@@ -108,6 +120,9 @@ class ClusterSubmit(object):
 
     def add_command(self, cmd):
         self.commands.append(cmd)
+
+    def add_clean_up_command(self, cmd):
+        self.clean_up_commands.append(cmd)
 
     def submit(self, job_display_name=None):
         self.job_display_name = job_display_name
@@ -128,10 +143,10 @@ class ClusterSubmit(object):
         if self.is_from_manager_object:
 
             try:
-
-                print('Setting signal to automatically requeue the job before timeout.')
-                signal.signal(signal.SIGUSR1, self.sig_handler)
-                signal.signal(signal.SIGTERM, self.term_handler)
+                if self.auto_resubmit_method == 'signal':
+                    print('Setting signal to automatically requeue the job before timeout.')
+                    signal.signal(signal.SIGUSR1, self.sig_handler)
+                    signal.signal(signal.SIGTERM, self.term_handler)
 
                 # Load arguments for session:
                 session = re.search(r'\/session_(\d+)', self.manager_script_path).group(1)
@@ -165,11 +180,9 @@ class ClusterSubmit(object):
             # Generate and save cluster manager script:
             manager_script_path = os.path.join(manager_script_dir, f'{timestamp}.sh')
             if self.manager == 'slurm':
-                manager_script = self.create_slurm_script(manager_script_path, timestamp, session)
+                self.create_slurm_script(manager_script_path, timestamp, session)
             else:
                 raise ValueError(f'{self.manager} is not a valid manager.')
-            with open(manager_script_path, mode='w') as file:
-                file.write(manager_script)
 
             # Save arguments for session:
             args_path = os.path.join(args_dir, f'session_{session}.yaml')
@@ -237,7 +250,9 @@ class ClusterSubmit(object):
         if self.memory:
             script.append(f'#SBATCH --mem={self.memory}')
 
-        script.append(f'#SBATCH --signal=USR1@{6 * 60}')
+        if self.auto_resubmit_method == 'signal':
+            script.append(f'#SBATCH --signal=USR1@{6 * 60}')
+            
         script.append(f'#SBATCH --open-mode=append')
 
         mail_type = []
@@ -280,7 +295,22 @@ class ClusterSubmit(object):
         if not self.no_srun:
             cmd = self.srun_options + ' ' + cmd if self.srun_options else cmd
             cmd = 'srun ' + cmd
+
+        if self.auto_resubmit_method == 'timeout':
+            cmd = f'timeout {self.timeout_time_limit} ' + cmd
+
         script.append(cmd)
 
-        return '\n'.join(script)
+        if self.auto_resubmit_method == 'timeout':
+            script.append('if [[ $? -eq 124 ]]; then')
+            script.append('    echo Job incomplete, submitting again...')
+            script.append(f'    sbatch {manager_script_path}')
+            script.append('    #SBATCH --mail-type=NONE')
+            script.append('fi')
+
+        for cmd in self.clean_up_commands:
+            script.append(cmd)
+
+        with open(manager_script_path, mode='w') as f:
+            f.write('\n'.join(script))
     

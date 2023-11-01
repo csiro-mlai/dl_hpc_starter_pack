@@ -1,3 +1,4 @@
+import hashlib
 import inspect
 import logging
 from typing import Optional
@@ -14,6 +15,7 @@ logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
 ).setLevel(logging.CRITICAL)
 from lightning.pytorch.plugins.environments import SLURMEnvironment
+
 
 
 def trainer_instance(
@@ -44,6 +46,7 @@ def trainer_instance(
     loggers: Optional[list] = None,
     callbacks: Optional[list] = None,  # [RichProgressBar()]
     plugins: Optional[list] = None,
+    enable_progress_bar: Optional[bool] = None,
     **kwargs,
 ) -> Trainer:
     """
@@ -88,15 +91,33 @@ def trainer_instance(
         callbacks - callbacks for Trainer.
         plugins - plugins for Trainer.
         kwargs - keyword arguments for Trainer.
+        enable_progress_bar - show the progress bar (will be turned off for submissions).
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
     callbacks = [] if callbacks is None else callbacks
     plugins = [] if plugins is None else plugins
 
+    if submit:
+        enable_progress_bar = False if enable_progress_bar is None else enable_progress_bar
+
     # Unsure if Lightning's SLURMEnvironment features fault-tolerant training:
     if submit:
-        plugins.append(SLURMEnvironment(auto_requeue=False))
+
+        # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
+        class DisabledSLURMEnvironment(SLURMEnvironment):
+            def detect() -> bool:
+                return False
+
+            @staticmethod
+            def _validate_srun_used() -> None:
+                return
+
+            @staticmethod
+            def _validate_srun_variables() -> None:
+                return
+            
+        plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
 
     # Deepspeed has its own autocast capabilities:
     # if 'strategy' in kwargs and 'precision' in kwargs:
@@ -111,15 +132,26 @@ def trainer_instance(
 
     # Loggers
     loggers.append(CSVLogger(exp_dir_trial))
-    loggers.append(TensorBoardLogger(exp_dir_trial, default_hp_metric=False))
+
+    # Remove 'lightning_logs' structure for tensorboard to allow different sessions to be grouped:
+    loggers.append(
+        TensorBoardLogger(exp_dir_trial, default_hp_metric=False, version='', name='tensorboard')
+    )  
     if neptune_api_key is not None:
-        custom_run_id = f'{config_name[:21]}_t_{trial}'
+        name = f'{config_name}_t_{trial}'
+        custom_run_id = str(
+            int.from_bytes(
+                hashlib.sha256(name.encode(encoding="ascii",errors="ignore")).digest()[:12], 'little'
+            )
+        ) 
         assert len(custom_run_id) <= 32, '"custom_run_id" must be less than or equal to 32 characters'
         assert neptune_username is not None, 'You must specify your neptune.ai username.'
         loggers.append(
             NeptuneLogger(
                 api_key=neptune_api_key,
                 project=f'{neptune_username}/{task.replace("_", "-")}',
+                name=name,
+                tags=[config_name, f'trial_{trial}'],
                 prefix='log',
                 custom_run_id=custom_run_id,
                 capture_stdout=False,
@@ -149,6 +181,7 @@ def trainer_instance(
                 every_n_epochs=every_n_epochs,
                 filename='{epoch:d}-{step:d}-{' + monitor + ':f}' if monitor else '{epoch:d}-{step:d}',
                 save_last=True,
+                enable_version_counter=False,
             )
         )
         if 'strategy' in kwargs:
@@ -225,5 +258,6 @@ def trainer_instance(
         accumulate_grad_batches=accumulate_grad_batches,
         deterministic=deterministic,
         num_sanity_val_steps=num_sanity_val_steps,
+        enable_progress_bar=enable_progress_bar,
         **kwargs,
     )

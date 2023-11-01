@@ -53,12 +53,12 @@ def main() -> None:
     """
     if not args.submit:
 
-        # Run locally
+        # Run locally:
         stages_fnc(args)
 
     else:
 
-        # Cluster object
+        # Cluster object:
         cluster = ClusterSubmit(
             args=args,
             fnc=stages_fnc,
@@ -78,30 +78,35 @@ def main() -> None:
             email_on_complete=True, 
             email_on_fail=True,
             cmd_line_args=cmd_line_args,
+            auto_resubmit_method='signal' if not hasattr(args, 'auto_resubmit_method') else args.auto_resubmit_method,
+            timeout_time_limit=None if not hasattr(args, 'timeout_time_limit') else args.timeout_time_limit,
+            auto_resubmit=args.auto_resubmit,
         )
 
-        # Source virtual environment
-        cluster.add_command('source ' + args.venv_path)
+        # Source virtual environment:
+        if args.venv_path:
+            cluster.add_command('source ' + args.venv_path)
 
-        # Debug flags
-        cluster.add_command('export NCCL_DEBUG=INFO')
-        cluster.add_command('export PYTHONFAULTHANDLER=1')
-
-        # Add options to the cluster manager submission script
+        # Add options to the cluster manager submission script:
         if 'cluster_manager_script_commands' in args:
             for i in args.cluster_manager_script_commands:
                 cluster.add_command(i)
 
-        # Add cluster manager options
+        # Add options to the cluster manager submission script:
+        if 'cluster_manager_script_clean_up_commands' in args:
+            for i in args.cluster_manager_script_clean_up_commands:
+                cluster.add_clean_up_command(i)
+
+        # Add cluster manager options:
         if 'cluster_manager_options' in args:
             for i in args.cluster_manager_options:
                 cluster.add_manager_option(option=i[0], value=i[1])
 
-        # Request the quality of service for the job
+        # Request the quality of service for the job:
         if args.qos:
             cluster.add_manager_option(cmd='qos', value=args.qos)
 
-        # Submit job to workload manager
+        # Submit job to workload manager:
         job_display_name = args.task + '_' + args.config_name
 
         if args.trial is not None:

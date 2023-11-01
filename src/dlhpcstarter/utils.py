@@ -110,8 +110,13 @@ def load_config_and_update_args(cmd_line_args: Namespace, print_args: bool = Fal
     Path(args.exp_dir_trial).mkdir(parents=True, exist_ok=True)
 
     # Do not resume from last if fast_dev_run is True:
-    args.resume_last = False if args.fast_dev_run else args.resume_last
+    # args.resume_last = False if args.fast_dev_run else True
 
+    # Prevent auto-resubmit if not resume_last:
+    args.resume_last, args.auto_resubmit = True, True
+    if args.resume_ckpt_path or args.resume_epoch:
+        args.resume_last, args.auto_resubmit = False, False
+        
     if print_args:
         print(f'args: {args.__dict__}')
 
@@ -121,7 +126,7 @@ def load_config_and_update_args(cmd_line_args: Namespace, print_args: bool = Fal
     return args, cmd_line_args
 
 
-def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int, extension: str = ".ckpt") -> str:
+def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int, extension: Union[list, str] = ['', '.ckpt']) -> str:
     """
     Get the checkpoint path based on the epoch number.
 
@@ -144,7 +149,7 @@ def get_epoch_ckpt_path(exp_dir_trial: str, load_epoch: int, extension: str = ".
     return ckpt_path[0]
 
 
-def get_best_ckpt_path(exp_dir_trial: str, monitor: str, monitor_mode: str, extension: str = '.ckpt') -> str:
+def get_best_ckpt_path(exp_dir_trial: str, monitor: str, monitor_mode: str, extension: Union[list, str] = ['', '.ckpt']) -> str:
     """
     Get the best performing checkpoint from the experiment directory.
 
@@ -158,7 +163,9 @@ def get_best_ckpt_path(exp_dir_trial: str, monitor: str, monitor_mode: str, exte
         Path to the epoch's checkpoint.
     """
 
-    ckpt_list = glob.glob(os.path.join(exp_dir_trial, f'*=*{monitor}=*{extension}'))
+    extension = list(extension) if isinstance(extension, str) else extension
+
+    ckpt_list = set([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f'*=*{monitor}=*{i}'))])
 
     if not ckpt_list:
         raise ValueError(f'No checkpoints exist for the regex: *=*{monitor}=*{extension} in the checkpoint directory: {exp_dir_trial}.')
@@ -182,7 +189,7 @@ def get_test_ckpt_path(
         monitor_mode: Optional[str] = None, 
         test_epoch: Optional[int] = None, 
         test_ckpt_path: Optional[str] = None,
-        extension: Optional[str] = '.ckpt',
+        extension: Optional[Union[list, str]] = None,
 ) -> str:
     """
     Get the test checkpoint.
@@ -203,7 +210,7 @@ def get_test_ckpt_path(
     assert set_options_bool.count(True) <= 1, f'Both "test_epoch" and "test_ckpt_path" cannot be set.'
 
     if test_ckpt_path:
-        assert os.path.isfile(test_ckpt_path), f'File does not exist: {test_ckpt_path}.'
+        assert os.path.isfile(test_ckpt_path) or os.path.isdir(test_ckpt_path), f'Checkpoint does not exist: {test_ckpt_path}.'
         ckpt_path = test_ckpt_path
     elif test_epoch is not None:
         ckpt_path = get_epoch_ckpt_path(exp_dir_trial, test_epoch, extension)
@@ -231,8 +238,8 @@ def resume_from_ckpt_path(
         resume_last: bool = False,
         resume_epoch: int = None,
         resume_ckpt_path: str = None,
-        extension: str = '.ckpt',
-):
+        extension: Union[list, str] = ['', '.ckpt'],
+    ):
     """
     Resume training from the specified checkpoint.
 
@@ -241,7 +248,7 @@ def resume_from_ckpt_path(
         resume_last - resume from last epoch.
         resume_epoch - get the path of the checkpoint for a given epoch.
         resume_ckpt_path - outright provide the checkpoint path.
-        extension - checkpoint extension.
+        extension - checkpoint extension (None for automatic detection of extension).
 
     Returns:
           ckpt_path - path to a checkpoint.
@@ -256,20 +263,18 @@ def resume_from_ckpt_path(
         f'A maximum of one of these options can be set: {options}. The following are set: {set_options}.'
 
     if resume_last:
-        last_ckpt_path = os.path.join(exp_dir_trial, f'last{extension}')
-
-        # last.ckpt will be a directory with deepspeed:
-        if os.path.isfile(last_ckpt_path) or os.path.isdir(last_ckpt_path):
+        last_ckpt_path = set([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f'last{i}'))])       
+        assert len(last_ckpt_path) <= 1, f'There cannot be more than one file or directory with "last" as the name: {last_ckpt_path}'
+        last_ckpt_path = last_ckpt_path[0] if last_ckpt_path else None
+        if last_ckpt_path:
             ckpt_path = os.path.join(exp_dir_trial, f'last{extension}')
         else:
-            warnings.warn('last.ckpt does not exist, starting training from epoch 0.')
+            warnings.warn('The "last" checkpoint does not exist, starting training from epoch 0.')
     elif resume_epoch is not None:
         ckpt_path = get_epoch_ckpt_path(exp_dir_trial, resume_epoch, extension)
-        raise ValueError('"resume_epoch" is never used and will be removed in the future as it interferes with the resume from resume_from_ckpt_path logic.')
     
     elif resume_ckpt_path:
         ckpt_path = resume_ckpt_path
-        raise ValueError('"resume_ckpt_path" is never used and will be removed in the future as it interferes with the resume from resume_from_ckpt_path logic.')
 
     if ckpt_path is not None:
         print('Resuming training from {}.'.format(ckpt_path))
@@ -310,12 +315,29 @@ def get_experiment_scores_csv_paths(
         if end_cutoff_date:
             csv_logs = [i for i in csv_logs if datetime.datetime.fromtimestamp(os.path.getctime(i)) < end_cutoff_date]
 
+    # Sort base on last modification date:
+    csv_logs.sort(key=lambda x: os.path.getmtime(x))
+
     return csv_logs
 
 
-def read_and_concatenate_experiment_scores(config_name, trial, **kwargs):
+def read_and_concatenate_experiment_scores(config_name, trial, only_most_recent=False, **kwargs):
     csv_logs = get_experiment_scores_csv_paths(config_name=config_name, trial=trial, **kwargs)
+    csv_logs = csv_logs[-1:] if only_most_recent else csv_logs
     return pd.concat([pd.read_csv(f) for f in csv_logs], ignore_index=True) if csv_logs else None 
+
+
+def get_experiment_best_test_scores(config_name, trial, monitor, monitor_mode, **kwargs):
+    assert monitor_mode == 'max' or monitor_mode == 'min'
+    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
+    if isinstance(df, pd.DataFrame):
+        best_val_epoch = df['epoch'][df[monitor].idxmax()] if monitor_mode == 'max' else df['epoch'][df[monitor].idxmin()]
+        df = df[df['epoch'] == best_val_epoch]
+        df = df[df.columns[df.columns.str.startswith('test_')].tolist() + ['epoch']]
+        df = df.iloc[[-1]].dropna(how='all')
+        df.insert(0, 'trial', trial) 
+        df.insert(0, 'config', config_name) 
+    return df
 
 
 def get_experiment_last_test_scores(config_name, trial, **kwargs):
@@ -328,10 +350,13 @@ def get_experiment_last_test_scores(config_name, trial, **kwargs):
     return df
 
 
-def get_config_test_scores(config_trial_list, **kwargs):
+def get_config_test_scores(config_trial_list, test_score_type, **kwargs):
     df_list = []
     for i in config_trial_list:
-        df = get_experiment_last_test_scores(config_name=i['config'], trial=i['trial'], **kwargs)
+        if test_score_type == 'last':
+            df = get_experiment_last_test_scores(config_name=i['config'], trial=i['trial'], **kwargs)
+        elif test_score_type == 'best':
+            df = get_experiment_best_test_scores(config_name=i['config'], trial=i['trial'], **kwargs)
         if isinstance(df, pd.DataFrame):
             df_list.append(df)
     return pd.concat(df_list)
@@ -363,7 +388,7 @@ def get_config_max_epochs(config_trial_list, **kwargs):
         if isinstance(df, pd.DataFrame):
             df_list.append(df)
     df = pd.concat(df_list).reset_index()
-    return df.loc[df.groupby(['config', 'trial'])['step'].idxmax()].reset_index(drop=True)
+    return df.loc[df.groupby(['config', 'trial'])['epoch'].idxmax()].reset_index(drop=True)
 
 
 def gpu_usage_and_visibility(cuda_visible_devices: Optional[str] = None, submit: bool = False):
@@ -387,4 +412,4 @@ def gpu_usage_and_visibility(cuda_visible_devices: Optional[str] = None, submit:
     if cuda_visible_devices and (not submit):
         os.environ['CUDA_VISIBLE_DEVICES'] = cuda_visible_devices
         print(f'CUDA_VISIBLE_DEVICES: {cuda_visible_devices}')
-        
+ 
