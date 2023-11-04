@@ -104,7 +104,7 @@ def main() -> None:
 
         # Request the quality of service for the job:
         if args.qos:
-            cluster.add_manager_option(cmd='qos', value=args.qos)
+            cluster.add_manager_option(option='qos', value=args.qos)
 
         # Submit job to workload manager:
         job_display_name = args.task + '_' + args.config_name
