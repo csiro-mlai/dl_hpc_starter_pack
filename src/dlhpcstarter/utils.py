@@ -10,10 +10,8 @@ from pathlib import Path
 from typing import Optional, Pattern, Union
 from collections import OrderedDict
 
-import GPUtil
 import numpy as np
 import pandas as pd
-import torch
 from hydra import compose, initialize_config_dir
 
 
