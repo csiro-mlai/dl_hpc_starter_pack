@@ -305,7 +305,7 @@ class ClusterSubmit(object):
             script.append('if [[ $? -eq 124 ]]; then')
             script.append('    echo Job incomplete, submitting again...')
             script.append(f'    sbatch {manager_script_path}')
-            script.append('    #SBATCH --mail-type=NONE')
+            script.append(f'    scontrol update jobid=$SLURM_JOB_ID mailtype=NONE')
             script.append('fi')
 
         for cmd in self.clean_up_commands:

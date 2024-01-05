@@ -8,6 +8,7 @@ import warnings
 from argparse import Namespace
 from pathlib import Path
 from typing import Optional, Pattern, Union
+from collections import OrderedDict
 
 import GPUtil
 import numpy as np
@@ -165,7 +166,7 @@ def get_best_ckpt_path(exp_dir_trial: str, monitor: str, monitor_mode: str, exte
 
     extension = list(extension) if isinstance(extension, str) else extension
 
-    ckpt_list = set([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f'*=*{monitor}=*{i}'))])
+    ckpt_list = list(OrderedDict.fromkeys([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f'*=*{monitor}=*{i}'))]))
 
     if not ckpt_list:
         raise ValueError(f'No checkpoints exist for the regex: *=*{monitor}=*{extension} in the checkpoint directory: {exp_dir_trial}.')
@@ -189,7 +190,7 @@ def get_test_ckpt_path(
         monitor_mode: Optional[str] = None, 
         test_epoch: Optional[int] = None, 
         test_ckpt_path: Optional[str] = None,
-        extension: Optional[Union[list, str]] = None,
+        extension: Optional[Union[list, str]] = ['', '.ckpt'],
 ) -> str:
     """
     Get the test checkpoint.
@@ -220,16 +221,17 @@ def get_test_ckpt_path(
     return ckpt_path
 
 
-def write_test_ckpt_path(ckpt_path: str, exp_dir_trial: str):
+def write_test_ckpt_path(ckpt_path: str, exp_dir_trial: str, file_name: str = 'test_ckpt_path'):
     """
     Write ckpt_path used for testing to a text file.
 
     Argument/s:
         ckpt_path - path to the checkpoint of the epoch that scored
             highest for the given validation metric.
-        exp_dir_trial - Experiment directory for the trial.
+        exp_dir_trial - experiment directory for the trial.
+        file_name - name of the text file.
     """
-    with open(os.path.join(exp_dir_trial, 'test_ckpt_path.txt'), 'a') as f:
+    with open(os.path.join(exp_dir_trial, f'{file_name}.txt'), 'a') as f:
         f.write(ckpt_path + '\n')
 
 
@@ -263,13 +265,11 @@ def resume_from_ckpt_path(
         f'A maximum of one of these options can be set: {options}. The following are set: {set_options}.'
 
     if resume_last:
-        last_ckpt_path = set([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f'last{i}'))])       
+        last_ckpt_path = list(OrderedDict.fromkeys([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f'last{i}'))]))       
         assert len(last_ckpt_path) <= 1, f'There cannot be more than one file or directory with "last" as the name: {last_ckpt_path}'
-        last_ckpt_path = last_ckpt_path[0] if last_ckpt_path else None
-        if last_ckpt_path:
-            ckpt_path = os.path.join(exp_dir_trial, f'last{extension}')
-        else:
+        if not last_ckpt_path:
             warnings.warn('The "last" checkpoint does not exist, starting training from epoch 0.')
+        ckpt_path = last_ckpt_path[0] if last_ckpt_path else ckpt_path
     elif resume_epoch is not None:
         ckpt_path = get_epoch_ckpt_path(exp_dir_trial, resume_epoch, extension)
     

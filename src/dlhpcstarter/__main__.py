@@ -24,7 +24,15 @@ def main() -> None:
     cmd_line_args = read_command_line_arguments()
 
     """
-    2. Import the 'stages' function for the task:
+    2. Load the configuration for the job and add it to 'args':
+    
+        This contains the paths, model configuration, the training and test configuration, the device & cluster manager 
+        configuration.
+    """
+    args, cmd_line_args = load_config_and_update_args(cmd_line_args=cmd_line_args)
+
+    """
+    3. Import the 'stages' function for the task:
     
         Imports the function that handles the training and testing stages for the task. The default location of the 
         stages() function is in the task's stages.py. The model is also initialised in the stages function based on the 
@@ -36,17 +44,9 @@ def main() -> None:
         For example: stages() in task.cifar10.stages 
     
     """
-    cmd_line_args.stages_definition = 'stages' if cmd_line_args.stages_definition is None else cmd_line_args.stages_definition
-    cmd_line_args.stages_module = 'stages_module' if cmd_line_args.stages_module is None else cmd_line_args.stages_module
-    stages_fnc = importer(definition=cmd_line_args.stages_definition, module=cmd_line_args.stages_module)
-
-    """
-    3. Load the configuration for the job and add it to 'args':
-    
-        This contains the paths, model configuration, the training and test configuration, the device & cluster manager 
-        configuration.
-    """
-    args, cmd_line_args = load_config_and_update_args(cmd_line_args=cmd_line_args)
+    args.stages_definition = 'stages' if args.stages_definition is None else args.stages_definition
+    args.stages_module = 'stages_module' if args.stages_module is None else args.stages_module
+    stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
 
     """
     4. Submit the job to the cluster manager (or run locally if args.submit = False).
