@@ -102,22 +102,22 @@ def trainer_instance(
         enable_progress_bar = False if enable_progress_bar is None else enable_progress_bar
 
     # Unsure if Lightning's SLURMEnvironment features fault-tolerant training:
-    if submit:
+    # if submit:
 
-        # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
-        class DisabledSLURMEnvironment(SLURMEnvironment):
-            def detect() -> bool:
-                return False
+    #     # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
+    #     class DisabledSLURMEnvironment(SLURMEnvironment):
+    #         def detect() -> bool:
+    #             return False
 
-            @staticmethod
-            def _validate_srun_used() -> None:
-                return
+    #         @staticmethod
+    #         def _validate_srun_used() -> None:
+    #             return
 
-            @staticmethod
-            def _validate_srun_variables() -> None:
-                return
+    #         @staticmethod
+    #         def _validate_srun_variables() -> None:
+    #             return
             
-        plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
+    #     plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
 
     # Deepspeed has its own autocast capabilities:
     # if 'strategy' in kwargs and 'precision' in kwargs:
@@ -226,8 +226,8 @@ def trainer_instance(
         )
 
     # Learning rate monitor
-    if sched_inter is not None:
-        callbacks.append(LearningRateMonitor(logging_interval=sched_inter))
+    # if sched_inter is not None:
+    callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
 
     # Accumulate gradient batches
     if accumulated_mbatch_size:
