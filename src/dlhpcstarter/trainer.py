@@ -160,7 +160,7 @@ def trainer_instance(
                 capture_traceback=False,
                 log_model_checkpoints=False,
                 source_files=[],
-                flush_period=30,
+                flush_period=60,
                 mode=neptune_mode,
             )
         )
