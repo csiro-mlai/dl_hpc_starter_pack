@@ -146,6 +146,7 @@ class ClusterSubmit(object):
                 if self.auto_resubmit_method == 'signal':
                     print('Setting signal to automatically requeue the job before timeout.')
                     signal.signal(signal.SIGUSR1, self.sig_handler)
+                    signal.signal(signal.SIGALRM, self.sig_handler)  # For one epoch only jobs.
                     signal.signal(signal.SIGTERM, self.term_handler)
 
                 # Load arguments for session:

@@ -1,6 +1,7 @@
 import hashlib
 import inspect
 import logging
+import signal
 from typing import Optional
 
 from lightning.pytorch import Trainer
@@ -216,6 +217,8 @@ def trainer_instance(
         class OneEpochOnlyCallback(Callback):
             def on_validation_epoch_end(self, trainer, pl_module):
                 trainer.should_stop = True
+                pl_module.trainer.should_stop = True
+                signal.alarm(10) 
         callbacks.append(OneEpochOnlyCallback())
 
     # Early stopping
