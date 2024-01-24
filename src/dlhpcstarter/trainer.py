@@ -233,8 +233,7 @@ def trainer_instance(
             )
         )
 
-    # Learning rate monitor
-    # if sched_inter is not None:
+    # Learning rate monitor:
     callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
 
     # Accumulate gradient batches
