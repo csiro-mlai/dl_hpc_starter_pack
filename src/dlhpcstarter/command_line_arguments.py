@@ -91,6 +91,7 @@ def read_command_line_arguments():
     cluster.add_argument('--no-cpus-per-task', '--no_cpus_per_task', default=None, action='store_true', help='Prevent the --cpus-per-task option from being placed in the Slurm script')
     cluster.add_argument('--no-gpus-per-node', '--no_gpus_per_node', default=None, action='store_true', help='Prevent the --gpus-per-node option from being placed in the Slurm script')
     cluster.add_argument('--no-ntasks-per-node', '--no_ntasks_per_node', default=None, action='store_true', help='Prevent the --no-ntasks-per-node option from being placed in the Slurm script')
+    cluster.add_argument('--one-epoch-only', '--one_epoch_only', default=None, action='store_true', help='Only performs one epoch of training')
 
     # System arguments:
     system = parser.add_argument_group('System arguments')

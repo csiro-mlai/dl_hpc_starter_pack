@@ -4,18 +4,17 @@ import logging
 from typing import Optional
 
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import (EarlyStopping, LearningRateMonitor,
-                                         ModelCheckpoint)
+from lightning.pytorch.callbacks import (Callback, EarlyStopping,
+                                         LearningRateMonitor, ModelCheckpoint)
 from lightning.pytorch.loggers import NeptuneLogger
 from lightning.pytorch.loggers.csv_logs import CSVLogger
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
+from lightning.pytorch.plugins.environments import SLURMEnvironment
 from lightning.pytorch.strategies import DeepSpeedStrategy
 
 logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
 ).setLevel(logging.CRITICAL)
-from lightning.pytorch.plugins.environments import SLURMEnvironment
-
 
 
 def trainer_instance(
@@ -47,6 +46,7 @@ def trainer_instance(
     callbacks: Optional[list] = None,  # [RichProgressBar()]
     plugins: Optional[list] = None,
     enable_progress_bar: Optional[bool] = None,
+    one_epoch_only: bool = False,
     **kwargs,
 ) -> Trainer:
     """
@@ -92,6 +92,7 @@ def trainer_instance(
         plugins - plugins for Trainer.
         kwargs - keyword arguments for Trainer.
         enable_progress_bar - show the progress bar (will be turned off for submissions).
+        one_epoch_only - perform only one epoch of training.
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
@@ -209,6 +210,13 @@ def trainer_instance(
     #             save_last=False,  # cannot resume from this checkpoint.
     #         )
     #     )
+
+    # Perform only one epoch of training:
+    if one_epoch_only:
+        class OneEpochOnlyCallback(Callback):
+            def on_validation_epoch_end(self, trainer, pl_module):
+                trainer.should_stop = True
+        callbacks.append(OneEpochOnlyCallback())
 
     # Early stopping
     if early_stopping:
