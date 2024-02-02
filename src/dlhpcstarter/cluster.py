@@ -212,7 +212,8 @@ class ClusterSubmit(object):
             print(f'Requeued job {job_id}.')
         else:
             print('Requeue failed...')
-        os._exit(0)
+        # os._exit(result)
+        sys.exit(result)
 
     def term_handler(self, signum, frame):
         print('Bypassing sigterm.')
@@ -252,7 +253,7 @@ class ClusterSubmit(object):
             script.append(f'#SBATCH --mem={self.memory}')
 
         if self.auto_resubmit_method == 'signal':
-            script.append(f'#SBATCH --signal=USR1@{6 * 60}')
+            script.append(f'#SBATCH --signal=USR1@{2 * 60}')
             
         script.append(f'#SBATCH --open-mode=append')
 

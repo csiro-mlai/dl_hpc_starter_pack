@@ -2,6 +2,8 @@ import hashlib
 import inspect
 import logging
 import signal
+import time
+from datetime import timedelta
 from typing import Optional
 
 from lightning.pytorch import Trainer
@@ -48,6 +50,7 @@ def trainer_instance(
     plugins: Optional[list] = None,
     enable_progress_bar: Optional[bool] = None,
     one_epoch_only: bool = False,
+    learning_rate_monitor: bool = False,
     **kwargs,
 ) -> Trainer:
     """
@@ -94,6 +97,7 @@ def trainer_instance(
         kwargs - keyword arguments for Trainer.
         enable_progress_bar - show the progress bar (will be turned off for submissions).
         one_epoch_only - perform only one epoch of training.
+        learning_rate_monitor - add the LearningRateMonitor as a callback.
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
@@ -186,13 +190,13 @@ def trainer_instance(
                 enable_version_counter=False,
             )
         )
-        if 'strategy' in kwargs:
-            if isinstance(kwargs['strategy'], str):
-                if 'deepspeed_stage_3' in kwargs['strategy']: 
-                    callbacks[-1].FILE_EXTENSION = ""
-            elif isinstance(kwargs['strategy'], DeepSpeedStrategy):
-                if kwargs['deepspeed_config']['stage'] == 3:
-                    callbacks[-1].FILE_EXTENSION = ""
+        # if 'strategy' in kwargs:
+        #     if isinstance(kwargs['strategy'], str):
+        #         if 'deepspeed_stage_3' in kwargs['strategy']: 
+        #             callbacks[-1].FILE_EXTENSION = ""
+        #     elif isinstance(kwargs['strategy'], DeepSpeedStrategy):
+        #         if kwargs['deepspeed_config']['stage'] == 3:
+        #             callbacks[-1].FILE_EXTENSION = ""
 
     # if every_n_train_steps:
     #     if resumable:
@@ -215,11 +219,20 @@ def trainer_instance(
     # Perform only one epoch of training:
     if one_epoch_only:
         class OneEpochOnlyCallback(Callback):
+            def __init__(self, neptune_api_key=None):
+                self.start_time = time.time()
+                self.neptune_api_key=neptune_api_key
             def on_validation_epoch_end(self, trainer, pl_module):
                 trainer.should_stop = True
                 pl_module.trainer.should_stop = True
-                signal.alarm(10) 
-        callbacks.append(OneEpochOnlyCallback())
+            # def on_train_end(self, trainer, pl_module):
+            #     elapsed_time = (time.time() - self.start_time) / 3600
+            #     print(f'Training epoch elapsed time (hours): {elapsed_time}')
+            #     pl_module.log('elapsed_time_hours', elapsed_time / 3600, on_step=True, on_epoch=False)
+            def teardown(self, trainer, pl_module, stage):
+                if stage == 'fit':
+                    signal.alarm(1) 
+        callbacks.append(OneEpochOnlyCallback(neptune_api_key=neptune_api_key))
 
     # Early stopping
     if early_stopping:
@@ -237,7 +250,8 @@ def trainer_instance(
         )
 
     # Learning rate monitor:
-    callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
+    if learning_rate_monitor:
+        callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
 
     # Accumulate gradient batches
     if accumulated_mbatch_size:
