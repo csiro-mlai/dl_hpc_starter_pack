@@ -51,6 +51,7 @@ def trainer_instance(
     enable_progress_bar: Optional[bool] = None,
     one_epoch_only: bool = False,
     learning_rate_monitor: bool = False,
+    disable_slurm_environment: bool = False,
     **kwargs,
 ) -> Trainer:
     """
@@ -98,6 +99,7 @@ def trainer_instance(
         enable_progress_bar - show the progress bar (will be turned off for submissions).
         one_epoch_only - perform only one epoch of training.
         learning_rate_monitor - add the LearningRateMonitor as a callback.
+        disable_slurm_environment - disable Lightning's SLURMEnvironment.
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
@@ -108,22 +110,22 @@ def trainer_instance(
         enable_progress_bar = False if enable_progress_bar is None else enable_progress_bar
 
     # Unsure if Lightning's SLURMEnvironment features fault-tolerant training:
-    # if submit:
+    if disable_slurm_environment:
 
-    #     # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
-    #     class DisabledSLURMEnvironment(SLURMEnvironment):
-    #         def detect() -> bool:
-    #             return False
+        # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
+        class DisabledSLURMEnvironment(SLURMEnvironment):
+            def detect() -> bool:
+                return False
 
-    #         @staticmethod
-    #         def _validate_srun_used() -> None:
-    #             return
+            @staticmethod
+            def _validate_srun_used() -> None:
+                return
 
-    #         @staticmethod
-    #         def _validate_srun_variables() -> None:
-    #             return
+            @staticmethod
+            def _validate_srun_variables() -> None:
+                return
             
-    #     plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
+        plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
 
     # Deepspeed has its own autocast capabilities:
     # if 'strategy' in kwargs and 'precision' in kwargs:
@@ -236,8 +238,8 @@ def trainer_instance(
 
     # Early stopping
     if early_stopping:
-        if 'strategy' in kwargs:
-            assert 'deepspeed' not in kwargs['strategy'], 'DeepSpeed does not work with early stopping currently.'
+        # if 'strategy' in kwargs:
+        #     assert 'deepspeed' not in kwargs['strategy'], 'DeepSpeed does not work with early stopping currently.'
         callbacks.append(
             EarlyStopping(
                 monitor=monitor,
