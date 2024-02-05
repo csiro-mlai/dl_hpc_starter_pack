@@ -14,6 +14,7 @@ from lightning.pytorch.loggers.csv_logs import CSVLogger
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 from lightning.pytorch.strategies import DeepSpeedStrategy
+from .cluster import ClusterSubmit
 
 logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
@@ -219,20 +220,21 @@ def trainer_instance(
     # Perform only one epoch of training:
     if one_epoch_only:
         class OneEpochOnlyCallback(Callback):
-            def __init__(self, neptune_api_key=None):
+            # def __init__(self, neptune_api_key=None):
+            def __init__(self):
                 self.start_time = time.time()
-                self.neptune_api_key=neptune_api_key
+                # self.neptune_api_key=neptune_api_key
             def on_validation_epoch_end(self, trainer, pl_module):
                 trainer.should_stop = True
                 pl_module.trainer.should_stop = True
-            # def on_train_end(self, trainer, pl_module):
-            #     elapsed_time = (time.time() - self.start_time) / 3600
-            #     print(f'Training epoch elapsed time (hours): {elapsed_time}')
+            def on_train_end(self, trainer, pl_module):
+                elapsed_time = (time.time() - self.start_time) / 3600
+                print(f'Training epoch elapsed time (hours): {elapsed_time}')
             #     pl_module.log('elapsed_time_hours', elapsed_time / 3600, on_step=True, on_epoch=False)
             def teardown(self, trainer, pl_module, stage):
                 if stage == 'fit':
-                    signal.alarm(1) 
-        callbacks.append(OneEpochOnlyCallback(neptune_api_key=neptune_api_key))
+                    ClusterSubmit.sig_handler('one_epoch_only', None)
+        callbacks.append(OneEpochOnlyCallback())
 
     # Early stopping
     if early_stopping:
