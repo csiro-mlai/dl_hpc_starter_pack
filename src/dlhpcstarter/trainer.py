@@ -16,6 +16,8 @@ from lightning.pytorch.plugins.environments import SLURMEnvironment
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from .cluster import ClusterSubmit
 
+from lightning.pytorch.loops.utilities import _is_max_limit_reached
+
 logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
 ).setLevel(logging.CRITICAL)
@@ -144,8 +146,21 @@ def trainer_instance(
 
     # Remove 'lightning_logs' structure for tensorboard to allow different sessions to be grouped:
     loggers.append(
-        TensorBoardLogger(exp_dir_trial, default_hp_metric=False, version='', name='tensorboard')
+        TensorBoardLogger(
+            exp_dir_trial, 
+            default_hp_metric=False, 
+            version='', 
+            name='tensorboard', 
+        )
     )  
+    # class TensorboardLogConfigTrial(Callback):
+    #     def __init__(self, config, trial):
+    #         self.config = config
+    #         self.trial = trial
+    #     def setup(self, trainer, pl_module, stage):
+    #         trainer.loggers[-1].log_hyperparams({'config': self.config, 'trial': self.trial})
+    # callbacks.append(TensorboardLogConfigTrial(config=config_name, trial=trial))
+
     if neptune_api_key is not None:
         name = f'{config_name}_t_{trial}'
         custom_run_id = str(
@@ -219,25 +234,6 @@ def trainer_instance(
     #         )
     #     )
 
-    # Perform only one epoch of training:
-    if one_epoch_only:
-        class OneEpochOnlyCallback(Callback):
-            # def __init__(self, neptune_api_key=None):
-            def __init__(self):
-                self.start_time = time.time()
-                # self.neptune_api_key=neptune_api_key
-            def on_validation_epoch_end(self, trainer, pl_module):
-                trainer.should_stop = True
-                pl_module.trainer.should_stop = True
-            def on_train_end(self, trainer, pl_module):
-                elapsed_time = (time.time() - self.start_time) / 3600
-                print(f'Training epoch elapsed time (hours): {elapsed_time}')
-            #     pl_module.log('elapsed_time_hours', elapsed_time / 3600, on_step=True, on_epoch=False)
-            def teardown(self, trainer, pl_module, stage):
-                if stage == 'fit':
-                    ClusterSubmit.sig_handler('one_epoch_only', None)
-        callbacks.append(OneEpochOnlyCallback())
-
     # Early stopping
     if early_stopping:
         # if 'strategy' in kwargs:
@@ -256,6 +252,29 @@ def trainer_instance(
     # Learning rate monitor:
     if learning_rate_monitor:
         callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
+
+    # Perform only one epoch of training:
+    if one_epoch_only:
+        assert not early_stopping, 'one_epoch_only is not setup for early_stopping'
+
+        class OneEpochOnlyCallback(Callback):
+            # def __init__(self, neptune_api_key=None):
+            def __init__(self, submit):
+                self.start_time = time.time()
+                self.submit = submit
+                # self.neptune_api_key=neptune_api_key
+            def on_validation_epoch_end(self, trainer, pl_module):
+                trainer.should_stop = True
+                pl_module.trainer.should_stop = True
+            def on_train_end(self, trainer, pl_module):
+                elapsed_time = (time.time() - self.start_time) / 3600
+                print(f'Training epoch elapsed time (hours): {elapsed_time}')
+            #     pl_module.log('elapsed_time_hours', elapsed_time / 3600, on_step=True, on_epoch=False)
+            def teardown(self, trainer, pl_module, stage):
+                done = _is_max_limit_reached(trainer.fit_loop.epoch_progress.current.processed, trainer.fit_loop.max_epochs)
+                if stage == 'fit' and self.submit and not done:
+                    ClusterSubmit.sig_handler('one_epoch_only', None)
+        callbacks.append(OneEpochOnlyCallback(submit=submit))
 
     # Accumulate gradient batches
     if accumulated_mbatch_size:

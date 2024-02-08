@@ -348,6 +348,15 @@ def get_experiment_last_scores(config_name, trial, subset, **kwargs):
     return df
 
 
+def get_experiment_all_scores(config_name, trial, subset, **kwargs):
+    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
+    if isinstance(df, pd.DataFrame):
+        df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch', 'step']].copy()
+        df.insert(0, 'trial', trial) 
+        df.insert(0, 'config', config_name) 
+    return df
+
+
 def get_config_scores(config_trial_list, score_type, **kwargs):
     df_list = []
     for i in config_trial_list:
@@ -355,15 +364,17 @@ def get_config_scores(config_trial_list, score_type, **kwargs):
             df = get_experiment_last_scores(config_name=i['config'], trial=i['trial'], **kwargs)
         elif score_type == 'best':
             df = get_experiment_best_scores(config_name=i['config'], trial=i['trial'], **kwargs)
+        elif score_type == 'all':
+            df = get_experiment_all_scores(config_name=i['config'], trial=i['trial'], **kwargs)
         if isinstance(df, pd.DataFrame):
             df_list.append(df)
     return pd.concat(df_list)
 
 
-def get_melted_config_scores(**kwargs):
+def get_melted_config_scores(id_vars=['config', 'trial'], **kwargs):
     df = get_config_scores(**kwargs)
     df = df.melt(
-        id_vars=['config', 'trial'],
+        id_vars=id_vars,
         var_name='metric',
         value_name='score',
     )
