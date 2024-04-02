@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 from hydra import compose, initialize_config_dir
 
+import duckdb
+
 
 def importer(
         definition: str,
@@ -319,39 +321,48 @@ def get_experiment_scores_csv_paths(
     return csv_logs
 
 
-def read_and_concatenate_experiment_scores(config_name, trial, only_most_recent=False, **kwargs):
+def read_and_concatenate_experiment_scores(config_name, trial, only_most_recent=False, use_duckdb=False, use_pyarrow=False, **kwargs):
     csv_logs = get_experiment_scores_csv_paths(config_name=config_name, trial=trial, **kwargs)
     csv_logs = csv_logs[-1:] if only_most_recent else csv_logs
-    return pd.concat([pd.read_csv(f) for f in csv_logs], ignore_index=True) if csv_logs else None 
+    if use_duckdb:
+        df = duckdb.sql(f"FROM read_csv([{', '.join([f"'{i}'" for i in csv_logs])}], union_by_name = true, filename = false);").df() if csv_logs else None
+    elif use_pyarrow:
+        df = pd.concat([pd.read_csv(f, engine='pyarrow') for f in csv_logs], ignore_index=True).copy() if csv_logs else None 
+    else:
+        df = pd.concat([pd.read_csv(f) for f in csv_logs], ignore_index=True).copy() if csv_logs else None 
+    return df
 
 
-def get_experiment_best_scores(config_name, trial, monitor, monitor_mode, subset, **kwargs):
+def get_experiment_best_scores(config_name, trial, monitor, monitor_mode, subset=None, **kwargs):
     assert monitor_mode == 'max' or monitor_mode == 'min'
     df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
     if isinstance(df, pd.DataFrame):
         best_epoch = df['epoch'][df[monitor].idxmax()] if monitor_mode == 'max' else df['epoch'][df[monitor].idxmin()]
         df = df[df['epoch'] == best_epoch]
-        df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch']]
+        if subset is not None:
+            df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch', 'step']]
         df = df.dropna(how='any').copy() #.iloc[[-1]]
         df.insert(0, 'trial', trial) 
         df.insert(0, 'config', config_name) 
     return df
 
 
-def get_experiment_last_scores(config_name, trial, subset, **kwargs):
+def get_experiment_last_scores(config_name, trial, subset=None, **kwargs):
     df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
     if isinstance(df, pd.DataFrame):
-        df = df[df.columns[df.columns.str.startswith(f'{subset}_')]]
+        if subset is not None:
+            df = df[df.columns[df.columns.str.startswith(f'{subset}_')]]
         df = df.iloc[[-1]]
         df.insert(0, 'trial', trial) 
         df.insert(0, 'config', config_name) 
     return df
 
 
-def get_experiment_all_scores(config_name, trial, subset, **kwargs):
+def get_experiment_all_scores(config_name, trial, subset=None, **kwargs):
     df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
     if isinstance(df, pd.DataFrame):
-        df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch', 'step']].copy()
+        if subset is not None:
+            df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch', 'step']].copy()
         df.insert(0, 'trial', trial) 
         df.insert(0, 'config', config_name) 
     return df
@@ -371,7 +382,7 @@ def get_config_scores(config_trial_list, score_type, **kwargs):
     return pd.concat(df_list)
 
 
-def get_melted_config_scores(id_vars=['config', 'trial'], **kwargs):
+def get_melted_config_scores(id_vars=['config', 'trial', 'epoch', 'step'], **kwargs):
     df = get_config_scores(**kwargs)
     df = df.melt(
         id_vars=id_vars,

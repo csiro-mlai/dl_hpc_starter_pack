@@ -1,56 +1,18 @@
-from argparse import Namespace
-from dlhpcstarter.command_line_arguments import read_command_line_arguments
-from dlhpcstarter.utils import importer, load_config_and_update_args
-from dlhpcstarter.cluster import ClusterSubmit
-from typing import Callable
+import os
 import sys
 
+from omegaconf.listconfig import ListConfig
 
-def main() -> None:
-    """
-    The main function handles the jobs for a task. It does the following in order:
-        1. Get command line arguments using argparse (or input your own arguments object to main()).
-        2. Import the 'stages' function for the task.
-        3. Load the configuration for the job and add it to 'args'.
-        4. Submit the job to the cluster manager (or run locally).
-    """
+from dlhpcstarter.cluster import ClusterSubmit
+from dlhpcstarter.command_line_arguments import read_command_line_arguments
+from dlhpcstarter.utils import importer, load_config_and_update_args
 
-    if sys.path[0] != '':
-        sys.path.insert(0, '')
 
-    """    
-    1. Get command line arguments using argparse for the job:
-    """
-    cmd_line_args = read_command_line_arguments()
-
-    """
-    2. Load the configuration for the job and add it to 'args':
-    
-        This contains the paths, model configuration, the training and test configuration, the device & cluster manager 
-        configuration.
-    """
-    args, cmd_line_args = load_config_and_update_args(cmd_line_args=cmd_line_args)
-
-    """
-    3. Import the 'stages' function for the task:
-    
-        Imports the function that handles the training and testing stages for the task. The default location of the 
-        stages() function is in the task's stages.py. The model is also initialised in the stages function based on the 
-        configuration.
-        
-        The definition and module of the stages function can also be manually set using 'stages_definition' and 
-        'stages_module', respectively.
-    
-        For example: stages() in task.cifar10.stages 
-    
-    """
-    args.stages_definition = 'stages' if args.stages_definition is None else args.stages_definition
-    args.stages_module = 'stages_module' if args.stages_module is None else args.stages_module
-    stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
-
+def submit(args, cmd_line_args, stages_fnc):
     """
     4. Submit the job to the cluster manager (or run locally if args.submit = False).
     """
+    
     if not args.submit:
 
         # Run locally:
@@ -113,6 +75,74 @@ def main() -> None:
             job_display_name = job_display_name + f'_trial_{args.trial}'
 
         cluster.submit(job_display_name=job_display_name + '_')
+
+def main() -> None:
+    """
+    The main function handles the jobs for a task. It does the following in order:
+        1. Get command line arguments using argparse (or input your own arguments object to main()).
+        2. Import the 'stages' function for the task.
+        3. Load the configuration for the job and add it to 'args'.
+        4. Submit the job to the cluster manager (or run locally).
+    """
+
+    if sys.path[0] != '':
+        sys.path.insert(0, '')
+
+    """    
+    1. Get command line arguments using argparse for the job:
+    """
+    cmd_line_args = read_command_line_arguments()
+
+    """
+    2. Load the configuration for the job and add it to 'args':
+    
+        This contains the paths, model configuration, the training and test configuration, the device & cluster manager 
+        configuration.
+    """
+    args, cmd_line_args = load_config_and_update_args(cmd_line_args=cmd_line_args)
+
+    """
+    3. Import the 'stages' function for the task:
+    
+        Imports the function that handles the training and testing stages for the task. The default location of the 
+        stages() function is in the task's stages.py. The model is also initialised in the stages function based on the 
+        configuration.
+        
+        The definition and module of the stages function can also be manually set using 'stages_definition' and 
+        'stages_module', respectively.
+    
+        For example: stages() in task.cifar10.stages 
+    
+    """
+    args.stages_definition = 'stages' if args.stages_definition is None else args.stages_definition
+    args.stages_module = 'stages_module' if args.stages_module is None else args.stages_module
+    stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
+
+    if 'search_space' not in args:
+        submit(args, cmd_line_args, stages_fnc)
+        
+    else:
+
+        # Search space:
+        def format_dict(d):
+            parts = []
+            for key, value in d.items():
+                if isinstance(value, ListConfig):
+                    value = '_'.join(map(str, value))
+                parts.append(f'{key}_{value}')
+            return '_'.join(parts)
+
+        base_config_name = args.config_name
+        keys, lists = zip(*args.search_space.items())
+        for values in zip(*lists):
+            config_changes = dict(zip(keys, values))
+            for key, value in config_changes.items():
+                setattr(args, key, value)
+            
+            args.config_name = base_config_name + '_' + format_dict(config_changes)
+            args.exp_dir_trial = os.path.join(args.exp_dir, args.task, args.config_name, 'trial_' + f'{args.trial}')
+
+            submit(args, cmd_line_args, stages_fnc)
 
 
 if __name__ == '__main__':
