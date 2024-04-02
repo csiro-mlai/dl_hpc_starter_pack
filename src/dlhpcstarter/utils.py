@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from hydra import compose, initialize_config_dir
 
-import duckdb
+# import duckdb
 
 
 def importer(
