@@ -114,11 +114,15 @@ def load_config_and_update_args(cmd_line_args: Namespace, print_args: bool = Fal
     # Do not resume from last if fast_dev_run is True:
     # args.resume_last = False if args.fast_dev_run else True
 
-    # Prevent auto-resubmit if one_epoch_only or not resume_last:
+    # Prevent auto_resubmit and resume_last if not resume_last:
     args.resume_last, args.auto_resubmit = True, True
-    if args.resume_ckpt_path or args.resume_epoch or args.one_epoch_only:
+    if args.resume_ckpt_path or args.resume_epoch:
         args.resume_last, args.auto_resubmit = False, False
         
+    # Prevent auto_resubmit if one_epoch_only :
+    if args.one_epoch_only:
+        args.auto_resubmit = False
+
     if print_args:
         print(f'args: {args.__dict__}')
 
