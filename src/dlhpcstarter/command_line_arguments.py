@@ -28,6 +28,7 @@ def read_command_line_arguments():
     # Directory paths:
     directories = parser.add_argument_group('Directory paths')
     directories.add_argument('--exp-dir', '--exp_dir', type=str, help='Experiment outputs save directory')
+    directories.add_argument('--exp-dir-trial', '--exp_dir_trial', type=str, help='Experiment outputs save directory for the trial')
     directories.add_argument('--work-dir', '--work_dir', type=str, help='Working directory')
     directories.add_argument('--dataset-dir', '--dataset_dir', type=str, help='The dataset directory')
     directories.add_argument('--ckpt-zoo-dir', '--ckpt_zoo_dir', type=str, help='The checkpoint zoo directory')

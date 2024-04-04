@@ -107,15 +107,16 @@ def load_config_and_update_args(cmd_line_args: Namespace, print_args: bool = Fal
 
     # Add the task, configuration name, and the trial number to the experiment directory:
     args.trial = args.trial if args.trial is not None else 0
-    args.exp_dir_trial = os.path.join(args.exp_dir, args.task, args.config_name, 'trial_' + f'{args.trial}')
+    if args.exp_dir_trial is None: 
+        args.exp_dir_trial = os.path.join(args.exp_dir, args.task, args.config_name, 'trial_' + f'{args.trial}')
     Path(args.exp_dir_trial).mkdir(parents=True, exist_ok=True)
 
     # Do not resume from last if fast_dev_run is True:
     # args.resume_last = False if args.fast_dev_run else True
 
-    # Prevent auto-resubmit if not resume_last:
+    # Prevent auto-resubmit if one_epoch_only or not resume_last:
     args.resume_last, args.auto_resubmit = True, True
-    if args.resume_ckpt_path or args.resume_epoch:
+    if args.resume_ckpt_path or args.resume_epoch or args.one_epoch_only:
         args.resume_last, args.auto_resubmit = False, False
         
     if print_args:

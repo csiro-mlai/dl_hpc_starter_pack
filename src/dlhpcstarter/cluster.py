@@ -79,7 +79,7 @@ class ClusterSubmit(object):
         self.fnc = fnc
         self.args = args
         self.cmd_line_args = cmd_line_args if isinstance(cmd_line_args, dict) else vars(cmd_line_args)
-        self.exp_dir = save_dir
+        self.save_dir = save_dir
         self.log_err = log_err
         self.log_out = log_out
         self.manager = manager
@@ -127,17 +127,17 @@ class ClusterSubmit(object):
     def submit(self, job_display_name=None):
         self.job_display_name = job_display_name
 
-        manager_script_dir = os.path.join(self.exp_dir, 'manager_scripts')
-        args_dir = os.path.join(self.exp_dir, 'arguments')
+        manager_script_dir = os.path.join(self.save_dir, 'manager_scripts')
+        args_dir = os.path.join(self.save_dir, 'arguments')
 
-        Path(self.exp_dir).mkdir(parents=True, exist_ok=True)
+        Path(self.save_dir).mkdir(parents=True, exist_ok=True)
         Path(manager_script_dir).mkdir(parents=True, exist_ok=True)
         Path(args_dir).mkdir(parents=True, exist_ok=True)
         if self.log_err:
-            self.err_log_path = os.path.join(self.exp_dir, 'error_logs')
+            self.err_log_path = os.path.join(self.save_dir, 'error_logs')
             Path(self.err_log_path).mkdir(parents=True, exist_ok=True)
         if self.log_out:
-            self.out_log_path = os.path.join(self.exp_dir, 'out_logs')
+            self.out_log_path = os.path.join(self.save_dir, 'out_logs')
             Path(self.out_log_path).mkdir(parents=True, exist_ok=True)
 
         if self.is_from_manager_object:
@@ -151,7 +151,7 @@ class ClusterSubmit(object):
 
                 # Load arguments for session:
                 session = re.search(r'\/session_(\d+)', self.manager_script_path).group(1)
-                args_path = os.path.join(self.exp_dir, 'arguments', f'session_{session}.yaml')
+                args_path = os.path.join(self.save_dir, 'arguments', f'session_{session}.yaml')
                 with open(args_path, 'r') as f:
                     args = yaml.safe_load(f)
                     args = DefaultMunch.fromDict(args)
@@ -164,7 +164,7 @@ class ClusterSubmit(object):
                 raise SystemExit
 
         else:
-            scripts_path = os.path.join(self.exp_dir, 'manager_scripts')
+            scripts_path = os.path.join(self.save_dir, 'manager_scripts')
 
             # Get max session number:
             files = os.listdir(scripts_path)

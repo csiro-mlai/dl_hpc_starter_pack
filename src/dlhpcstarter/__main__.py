@@ -1,3 +1,4 @@
+import copy
 import os
 import sys
 
@@ -118,7 +119,7 @@ def main() -> None:
     args.stages_module = 'stages_module' if args.stages_module is None else args.stages_module
     stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
 
-    if 'search_space' not in args:
+    if 'search_space' not in args or bool(args.manager_script_path):
         submit(args, cmd_line_args, stages_fnc)
         
     else:
@@ -135,14 +136,20 @@ def main() -> None:
         base_config_name = args.config_name
         keys, lists = zip(*args.search_space.items())
         for values in zip(*lists):
+            args_copy = copy.deepcopy(args)
+            cmd_line_args_copy = copy.deepcopy(args)
             config_changes = dict(zip(keys, values))
             for key, value in config_changes.items():
-                setattr(args, key, value)
+                setattr(args_copy, key, value)
             
-            args.config_name = base_config_name + '_' + format_dict(config_changes)
-            args.exp_dir_trial = os.path.join(args.exp_dir, args.task, args.config_name, 'trial_' + f'{args.trial}')
+            args_copy.config_name = base_config_name + '_' + format_dict(config_changes)
+            print(f'Running search config: {args_copy.config_name}')
+            args_copy.exp_dir_trial = os.path.join(args_copy.exp_dir, args_copy.task, args_copy.config_name, 'trial_' + f'{args_copy.trial}')
+            cmd_line_args_copy.exp_dir_trial = args_copy.exp_dir_trial
+            
+            del args_copy.search_space
 
-            submit(args, cmd_line_args, stages_fnc)
+            submit(args_copy, cmd_line_args_copy, stages_fnc)
 
 
 if __name__ == '__main__':
