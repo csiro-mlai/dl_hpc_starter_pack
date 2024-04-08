@@ -1,6 +1,7 @@
 import copy
 import os
 import sys
+from pathlib import Path
 
 from omegaconf.listconfig import ListConfig
 
@@ -124,10 +125,22 @@ def main() -> None:
         
     else:
 
+        # Check if path:
+        def is_path(string):
+            if not isinstance(string, str):
+                return False
+            try:
+                path = Path(string)
+                return len(path.parts) > 1
+            except ValueError:
+                return False
+
         # Search space:
         def format_dict(d):
             parts = []
             for key, value in d.items():
+                if is_path(value):
+                    continue
                 if isinstance(value, ListConfig):
                     value = '_'.join(map(str, value))
                 parts.append(f'{key}_{value}')
