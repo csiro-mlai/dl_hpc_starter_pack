@@ -43,7 +43,6 @@ def submit(args, cmd_line_args, stages_fnc):
             email_on_fail=True,
             cmd_line_args=cmd_line_args,
             auto_resubmit_method='signal' if not hasattr(args, 'auto_resubmit_method') else args.auto_resubmit_method,
-            timeout_time_limit=None if not hasattr(args, 'timeout_time_limit') else args.timeout_time_limit,
             auto_resubmit=args.auto_resubmit,
         )
 
@@ -120,7 +119,10 @@ def main() -> None:
     args.stages_module = 'stages_module' if args.stages_module is None else args.stages_module
     stages_fnc = importer(definition=args.stages_definition, module=args.stages_module)
 
-    if 'search_space' not in args or bool(args.manager_script_path):
+    args.search_space = None if 'search_space' not in args else args.search_space
+    args.search_space_ignore_keys = [] if 'search_space_ignore_keys' not in args else args.search_space_ignore_keys
+
+    if args.search_space is None or bool(args.manager_script_path):
         submit(args, cmd_line_args, stages_fnc)
         
     else:
@@ -136,15 +138,21 @@ def main() -> None:
                 return False
 
         # Search space:
-        def format_dict(d):
+        def format_dict(d, ignore=None):
             parts = []
             for key, value in d.items():
-                if is_path(value):
+                if is_path(value) or key in ignore:
                     continue
                 if isinstance(value, ListConfig):
                     value = '_'.join(map(str, value))
                 parts.append(f'{key}_{value}')
             return '_'.join(parts)
+
+        # Get the length of the first list in the dictionary to compare against:
+        first_list_len = len(next(iter(args.search_space.values())))
+
+        # Assert that all lists in the dictionary have the same length:
+        assert all(len(i) == first_list_len for i in args.search_space.values()), "Not all lists in the search space have the same length."
 
         base_config_name = args.config_name
         keys, lists = zip(*args.search_space.items())
@@ -155,7 +163,7 @@ def main() -> None:
             for key, value in config_changes.items():
                 setattr(args_copy, key, value)
             
-            args_copy.config_name = base_config_name + '_' + format_dict(config_changes)
+            args_copy.config_name = base_config_name + '_' + format_dict(config_changes, args.search_space_ignore_keys)
             print(f'Running search config: {args_copy.config_name}')
             args_copy.exp_dir_trial = os.path.join(args_copy.exp_dir, args_copy.task, args_copy.config_name, 'trial_' + f'{args_copy.trial}')
             cmd_line_args_copy.exp_dir_trial = args_copy.exp_dir_trial

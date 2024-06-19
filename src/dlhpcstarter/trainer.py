@@ -1,22 +1,29 @@
 import hashlib
 import inspect
 import logging
+import os
 import signal
 import time
+import uuid
 from datetime import timedelta
 from typing import Optional
 
+import torch
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import (Callback, EarlyStopping,
-                                         LearningRateMonitor, ModelCheckpoint)
-from lightning.pytorch.loggers import NeptuneLogger
+from lightning.pytorch.callbacks import (
+    Callback,
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
+from lightning.pytorch.loggers import MLFlowLogger, NeptuneLogger
 from lightning.pytorch.loggers.csv_logs import CSVLogger
 from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
+from lightning.pytorch.loops.utilities import _is_max_limit_reached
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 from lightning.pytorch.strategies import DeepSpeedStrategy
-from .cluster import ClusterSubmit
 
-from lightning.pytorch.loops.utilities import _is_max_limit_reached
+from .cluster import ClusterSubmit
 
 logging.getLogger(
     "neptune.new.internal.operation_processors.async_operation_processor",
@@ -33,6 +40,7 @@ def trainer_instance(
     patience: int = 0,
     min_delta: float = 0.0,
     divergence_threshold: Optional[float] = None,
+    exp_dir: Optional[str] = None,
     exp_dir_trial: Optional[str] = None,
     sched_inter: Optional[str] = None,  # 'step', 'epoch', or None.
     save_top_k: int = 1,
@@ -54,7 +62,8 @@ def trainer_instance(
     enable_progress_bar: Optional[bool] = None,
     one_epoch_only: bool = False,
     learning_rate_monitor: bool = False,
-    disable_slurm_environment: bool = False,
+    # disable_slurm_environment: bool = False,
+    mlflow_logger: bool = False,
     **kwargs,
 ) -> Trainer:
     """
@@ -79,6 +88,7 @@ def trainer_instance(
         min_delta - minimum change in the monitored quantity to qualify as an
             improvement.
         divergence_threshold - stop training as soon as the monitored quantity becomes worse than this threshold.
+        exp_dir - experiment directory.
         exp_dir_trial - experiment directory for the trial. All outputs are saved to this path.
         sched_inter - learning rate scheduler interval ('step' or 'epoch').
         save_top_k - best k models saved according to the monitored metric. If
@@ -102,7 +112,7 @@ def trainer_instance(
         enable_progress_bar - show the progress bar (will be turned off for submissions).
         one_epoch_only - perform only one epoch of training.
         learning_rate_monitor - add the LearningRateMonitor as a callback.
-        disable_slurm_environment - disable Lightning's SLURMEnvironment.
+        # disable_slurm_environment - disable Lightning's SLURMEnvironment.
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
@@ -110,25 +120,26 @@ def trainer_instance(
     plugins = [] if plugins is None else plugins
 
     if submit:
+        plugins.append(SLURMEnvironment(auto_requeue=False))
         enable_progress_bar = False if enable_progress_bar is None else enable_progress_bar
 
     # Unsure if Lightning's SLURMEnvironment features fault-tolerant training:
-    if disable_slurm_environment:
+    # if disable_slurm_environment:
 
-        # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
-        class DisabledSLURMEnvironment(SLURMEnvironment):
-            def detect() -> bool:
-                return False
+    #     # See: https://github.com/Lightning-AI/lightning/issues/6389#issuecomment-1377759948
+    #     class DisabledSLURMEnvironment(SLURMEnvironment):
+    #         def detect() -> bool:
+    #             return False
 
-            @staticmethod
-            def _validate_srun_used() -> None:
-                return
+    #         @staticmethod
+    #         def _validate_srun_used() -> None:
+    #             return
 
-            @staticmethod
-            def _validate_srun_variables() -> None:
-                return
+    #         @staticmethod
+    #         def _validate_srun_variables() -> None:
+    #             return
             
-        plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
+    #     plugins.append(DisabledSLURMEnvironment(auto_requeue=False))
 
     # Deepspeed has its own autocast capabilities:
     # if 'strategy' in kwargs and 'precision' in kwargs:
@@ -188,6 +199,29 @@ def trainer_instance(
                 mode=neptune_mode,
             )
         )
+
+    if mlflow_logger:
+        run_name = f'{config_name}_t_{trial}'
+        run_id_path = os.path.join(exp_dir_trial, 'mlflow_run_id.txt')
+        if os.path.exists(run_id_path):
+            with open(run_id_path, 'r') as f:
+                run_id = f.read()
+        else:
+            run_id = None
+        loggers.append(
+            MLFlowLogger(
+                experiment_name=task,
+                save_dir=os.path.join(exp_dir, task, '.mlruns'),
+                log_model=False,
+                tracking_uri=None,
+                run_name=run_name,
+                run_id=run_id,
+                tags={'config': config_name, 'trial': trial},
+            )
+        )
+        if not os.path.exists(run_id_path):
+            with open(run_id_path, 'w') as f:
+                f.write(loggers[-1].version)
 
     # Model checkpointing
     assert (every_n_epochs is not None) or (every_n_train_steps is not None), 'Neither "every_n_epochs" or ' \
@@ -273,7 +307,12 @@ def trainer_instance(
             def teardown(self, trainer, pl_module, stage):
                 done = _is_max_limit_reached(trainer.fit_loop.epoch_progress.current.processed, trainer.fit_loop.max_epochs)
                 if stage == 'fit' and self.submit and not done:
-                    ClusterSubmit.sig_handler('one_epoch_only', None)
+                    rank_0 = True
+                    if torch.distributed.is_initialized():
+                        if torch.distributed.get_rank() != 0:
+                            rank_0 = False
+                    if rank_0:
+                        ClusterSubmit.sig_handler('one_epoch_only', None)
         callbacks.append(OneEpochOnlyCallback(submit=submit))
 
     # Accumulate gradient batches

@@ -1,4 +1,5 @@
 import datetime
+import math
 import os
 import re
 import signal
@@ -45,7 +46,6 @@ class ClusterSubmit(object):
             email_on_fail: bool = True,
             auto_resubmit: bool = True,
             auto_resubmit_method: str = 'signal',
-            timeout_time_limit: str = None,
     ):
         """
         Argument/s:
@@ -74,7 +74,6 @@ class ClusterSubmit(object):
             email_on_fail - send notification via email on job fail.
             auto_resubmit - flag for automatically resubmitting to the cluster.
             auto_resubmit_method - method of automatically resubmitting job to queue.
-            timeout_time_limit - timeout time limit.
         """
         self.fnc = fnc
         self.args = args
@@ -101,7 +100,6 @@ class ClusterSubmit(object):
         self.email_on_fail = email_on_fail
         self.auto_resubmit = auto_resubmit
         self.auto_resubmit_method = auto_resubmit_method
-        self.timeout_time_limit = timeout_time_limit
 
         self.auto_resubmit_method = self.auto_resubmit_method if self.auto_resubmit else None 
 
@@ -278,6 +276,27 @@ class ClusterSubmit(object):
         for cmd in self.commands:
             script.append(cmd)
 
+
+        """
+        Below is not needed completely as we save the arguments to file now.
+        Would only need to pass a few arguments, like task and config.
+        This would alleviate the issue with the store_true argparse arguments.
+        e.g.,
+        
+        cmd_line_args = f'--manager_script_path {manager_script_path}'
+        cmd_line_args = f'--task {args.task}'
+        cmd_line_args = f'--config {args.config}'
+        cmd_line_args = f'--trial {args.trial}'
+
+        its just so it can find: 
+
+        args_path = os.path.join(args_dir, f'session_{session}.yaml')
+        
+        i.e.: exp_dir_trial.
+        
+        Then no need for None in command line arguments.
+
+        """
         cmd_line_args = []
         for k, v in self.cmd_line_args.items():
             if v is not None:
@@ -300,7 +319,24 @@ class ClusterSubmit(object):
             cmd = 'srun ' + cmd
 
         if self.auto_resubmit_method == 'timeout':
-            cmd = f'timeout {self.timeout_time_limit} ' + cmd
+            
+            self.time_limit = '1-00:00:00' if self.time_limit == '24:00:00' else self.time_limit
+            
+            if self.time_limit.count(':') == 1:
+                format = '%M:%S'
+            elif self.time_limit.count(':') == 2:
+                format = '%H:%M:%S'               
+            if '-' in self.time_limit:
+                format = '%d-' + format
+            t = datetime.datetime.strptime(self.time_limit, format)
+            
+            if '-' in self.time_limit:
+                delta = datetime.timedelta(days=t.day, hours=t.hour, minutes=t.minute, seconds=t.second)
+            else:
+                delta = datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            
+            minutes = math.floor((delta.total_seconds() / 60) - 2)
+            cmd = f'timeout {minutes}m ' + cmd
 
         script.append(cmd)
 

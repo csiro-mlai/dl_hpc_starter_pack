@@ -1,20 +1,16 @@
 import copy
-import datetime
 import glob
 import importlib
 import os
 import re
 import warnings
 from argparse import Namespace
-from pathlib import Path
-from typing import Optional, Pattern, Union
 from collections import OrderedDict
+from pathlib import Path
+from typing import Optional, Union
 
 import numpy as np
-import pandas as pd
 from hydra import compose, initialize_config_dir
-
-# import duckdb
 
 
 def importer(
@@ -119,15 +115,90 @@ def load_config_and_update_args(cmd_line_args: Namespace, print_args: bool = Fal
     if args.resume_ckpt_path or args.resume_epoch:
         args.resume_last, args.auto_resubmit = False, False
         
-    # Prevent auto_resubmit if one_epoch_only :
-    if args.one_epoch_only:
+    # Prevent auto_resubmit if one_epoch_only:
+    if args.one_epoch_only and args.auto_resubmit_method != 'timeout':
         args.auto_resubmit = False
+        
+    # These all should be overwriteable through command line args.
+    if args.dataloader_zero_workers:
+        args.num_workers = 0
+        args.prefetch_factor = None
+        
+    if args.mbatch_size_one:
+        args.mbatch_size = 1
+        
+    if args.force_single_device:
+        args.devices = 1
+        args.num_nodes = 1
+
+    if args.force_single_node:
+        args.num_nodes = 1
 
     if print_args:
         print(f'args: {args.__dict__}')
 
     # Print GPU usage and set GPU visibility:
-    gpu_usage_and_visibility(args.cuda_visible_devices, args.submit)
+    gpu_visibility(args.cuda_visible_devices, args.submit)
+
+    return args, cmd_line_args
+
+
+def load_config_and_update_args_rev_a(cmd_line_args: Namespace, print_args: bool = False) -> None:
+    """
+    Loads the configuration .yaml file and updates the args object.
+
+    Argument/s:
+        cmd_line_args - command line arguments object.
+        print_args - print the arguments for the job.
+    """
+    # Make a deepcopy of the command line arguments:
+    args = copy.deepcopy(cmd_line_args)
+
+    # Process configuration file paths
+    args.work_dir = args.work_dir if hasattr(args, 'work_dir') and args.work_dir else os.getcwd()
+    args.config_file_name = args.config + ('' if args.config.endswith('.yaml') else '.yaml')
+    args.config_name = Path(args.config).stem
+    args.config_dir = Path(args.config).parent
+    args.config_dir = os.path.join(args.work_dir, args.config_dir) if not os.path.isabs(args.config_dir) else args.config_dir
+
+    # Load configuration
+    with initialize_config_dir(version_base=None, config_dir=str(args.config_dir)):
+        config = compose(config_name=args.config_name)
+
+    # Update args with config, overwriting config with cmd_line_args:
+    for k, v in config.items():
+        if hasattr(args, k) and getattr(args, k) is not None:
+            continue 
+        setattr(args, k, v)
+
+    # Check for critical attributes:
+    critical_keys = ['module', 'definition', 'exp_dir']
+    for key in critical_keys:
+        assert hasattr(args, key) and getattr(args, key), f'"{key}" must be specified as a command line argument or in {args.config_file_name}.'
+
+    # Set defaults:
+    args.num_workers = args.num_workers if hasattr(args, 'num_workers') and args.num_workers is not None else 0
+    args.num_nodes = args.num_nodes if hasattr(args, 'num_nodes') and args.num_nodes is not None else 1
+    args.trial = args.trial if hasattr(args, 'trial') and args.trial is not None else 0
+    args.resume_last, args.auto_resubmit = True, True
+
+    # Update the experiment directory to include trial information
+    args.exp_dir_trial = os.path.join(args.exp_dir, args.task, args.config_name, f'trial_{args.trial}')
+    Path(args.exp_dir_trial).mkdir(parents=True, exist_ok=True)
+
+    # Conditional settings based on args properties
+    if hasattr(args, 'resume_ckpt_path') or hasattr(args, 'resume_epoch'):
+        args.resume_last, args.auto_resubmit = False, False
+
+    # Adjust auto_resubmit based on one_epoch_only
+    if hasattr(args, 'one_epoch_only') and args.one_epoch_only and args.auto_resubmit_method != 'timeout':
+        args.auto_resubmit = False
+
+    if print_args:
+        print(f'args: {vars(args)}')
+
+    # Print GPU usage and set GPU visibility:
+    gpu_visibility(args.cuda_visible_devices, args.submit)
 
     return args, cmd_line_args
 
@@ -287,154 +358,20 @@ def resume_from_ckpt_path(
     return ckpt_path
 
 
-def get_experiment_scores_csv_paths(
-        config_name: str, 
-        trial: Union[str, int], 
-        task: str, 
-        exp_dir: str, 
-        log_dir: str = 'lightning_logs', 
-        glob_filter: str = '**/*.csv', 
-        start_cutoff_date: Optional[datetime.datetime] = None,
-        end_cutoff_date: Optional[datetime.datetime] = None,
-        date_regex: Pattern[str] = r'([0-9]{2}\-[0-9]{2}\-[0-9]{4}\_[0-9]{2}\-[0-9]{2}\-[0-9]{2})',
-        strptime_format: str = '%d-%m-%Y_%H-%M-%S',
-        trial_prefix: str = 'trial_' 
-    ):
-    regex = os.path.join(exp_dir, task, config_name, f'{trial_prefix}{trial}', log_dir, glob_filter)
-    csv_logs = glob.glob(regex, recursive=True)
-
-    if len(csv_logs) == 0:
-        warnings.warn(f'No files found for {regex}.')
-    else:
-        datetime_list = []
-        for i in csv_logs:
-            if bool(re.search(date_regex, i)):     
-                datetime_list.append(datetime.datetime.strptime(re.search(date_regex, i)[1], strptime_format))
-            else:
-                datetime_list.append(datetime.datetime.fromtimestamp(os.path.getctime(i)))
-
-        if start_cutoff_date:
-            csv_logs = [i for i, j in zip(csv_logs, datetime_list) if j > start_cutoff_date]
-            datetime_list = [i for i in datetime_list if i > start_cutoff_date]  # Remove here for end_cuttoff_date.
-
-        if end_cutoff_date:
-            csv_logs = [i for i in csv_logs if datetime.datetime.fromtimestamp(os.path.getctime(i)) < end_cutoff_date]
-
-    # Sort base on last modification date:
-    csv_logs.sort(key=lambda x: os.path.getmtime(x))
-
-    return csv_logs
-
-
-def read_and_concatenate_experiment_scores(config_name, trial, only_most_recent=False, use_duckdb=False, use_pyarrow=False, **kwargs):
-    csv_logs = get_experiment_scores_csv_paths(config_name=config_name, trial=trial, **kwargs)
-    csv_logs = csv_logs[-1:] if only_most_recent else csv_logs
-    if use_duckdb:
-        df = duckdb.sql(f"FROM read_csv([{', '.join([f"'{i}'" for i in csv_logs])}], union_by_name = true, filename = false);").df() if csv_logs else None
-    elif use_pyarrow:
-        df = pd.concat([pd.read_csv(f, engine='pyarrow') for f in csv_logs], ignore_index=True).copy() if csv_logs else None 
-    else:
-        df = pd.concat([pd.read_csv(f) for f in csv_logs], ignore_index=True).copy() if csv_logs else None 
-    return df
-
-
-def get_experiment_best_scores(config_name, trial, monitor, monitor_mode, subset=None, **kwargs):
-    assert monitor_mode == 'max' or monitor_mode == 'min'
-    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
-    if isinstance(df, pd.DataFrame):
-        best_epoch = df['epoch'][df[monitor].idxmax()] if monitor_mode == 'max' else df['epoch'][df[monitor].idxmin()]
-        df = df[df['epoch'] == best_epoch]
-        if subset is not None:
-            df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch', 'step']]
-        df = df.dropna(how='any').copy() #.iloc[[-1]]
-        df.insert(0, 'trial', trial) 
-        df.insert(0, 'config', config_name) 
-    return df
-
-
-def get_experiment_last_scores(config_name, trial, subset=None, **kwargs):
-    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
-    if isinstance(df, pd.DataFrame):
-        if subset is not None:
-            df = df[df.columns[df.columns.str.startswith(f'{subset}_')]]
-        df = df.iloc[[-1]]
-        df.insert(0, 'trial', trial) 
-        df.insert(0, 'config', config_name) 
-    return df
-
-
-def get_experiment_all_scores(config_name, trial, subset=None, **kwargs):
-    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
-    if isinstance(df, pd.DataFrame):
-        if subset is not None:
-            df = df[df.columns[df.columns.str.startswith(f'{subset}_')].tolist() + ['epoch', 'step']].copy()
-        df.insert(0, 'trial', trial) 
-        df.insert(0, 'config', config_name) 
-    return df
-
-
-def get_config_scores(config_trial_list, score_type, **kwargs):
-    df_list = []
-    for i in config_trial_list:
-        if score_type == 'last':
-            df = get_experiment_last_scores(config_name=i['config'], trial=i['trial'], **kwargs)
-        elif score_type == 'best':
-            df = get_experiment_best_scores(config_name=i['config'], trial=i['trial'], **kwargs)
-        elif score_type == 'all':
-            df = get_experiment_all_scores(config_name=i['config'], trial=i['trial'], **kwargs)
-        if isinstance(df, pd.DataFrame):
-            df_list.append(df)
-    return pd.concat(df_list)
-
-
-def get_melted_config_scores(id_vars=['config', 'trial', 'epoch', 'step'], **kwargs):
-    df = get_config_scores(**kwargs)
-    df = df.melt(
-        id_vars=id_vars,
-        var_name='metric',
-        value_name='score',
-    )
-    return df
-
-
-def get_config_epochs_steps(config_name, trial, **kwargs):
-    df = read_and_concatenate_experiment_scores(config_name=config_name, trial=trial, **kwargs)
-    if isinstance(df, pd.DataFrame):
-        df = df[['epoch', 'step']]
-        df.insert(0, 'trial', trial) 
-        df.insert(0, 'config', config_name) 
-    return df
-
-
-def get_config_max_epochs(config_trial_list, **kwargs):
-    df_list = []
-    for i in config_trial_list:
-        df = get_config_epochs_steps(config_name=i['config'], trial=i['trial'], **kwargs)
-        if isinstance(df, pd.DataFrame):
-            df_list.append(df)
-    df = pd.concat(df_list).reset_index()
-    return df.loc[df.groupby(['config', 'trial'])['epoch'].idxmax()].reset_index(drop=True)
-
-
-def gpu_usage_and_visibility(cuda_visible_devices: Optional[str] = None, submit: bool = False):
+def gpu_visibility(cuda_visible_devices: Optional[str] = None, submit: bool = False):
     """
-    Prints out GPU utilisation and sets the visibility of the GPUs to the job.
+    Sets the visibility of the GPUs to the job.
 
     Argument/s:
         cuda_visible_devices - which GPUs are visible to the job.
         submit - if the job is being submitted to a cluster manager, ignore GPU visibility requirements.
     """
+    
+    if cuda_visible_devices:
 
-    # Print GPU usage:
-    # if torch.cuda.is_available():
-    #     try:
-    #         for gpu in GPUtil.getGPUs():
-    #             print(f'Initial utilisation on GPU:{gpu.id} is {gpu.memoryUtil:0.3f}.')
-    #     except Exception as e:
-    #         print(f'NVIDIA-SMI is not working: {e}.')
+        assert not submit, "'cuda_visible_devices' can only be used when not submitting jobs to a cluster manager."
 
-    # Determine the visibility of devices:
-    if cuda_visible_devices and (not submit):
+        # Determine the visibility of devices:
         os.environ['CUDA_VISIBLE_DEVICES'] = cuda_visible_devices
         print(f'CUDA_VISIBLE_DEVICES: {cuda_visible_devices}')
- 
+    
