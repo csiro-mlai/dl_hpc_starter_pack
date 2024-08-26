@@ -23,6 +23,41 @@ The Deep Learning and HPC starter pack is available on PyPI:
 pip install dlhpcstarter
 ```
 
+# TL;DR
+To train and test a model:
+
+```
+dlhpcstarter -t cifar10 -c tests/task/cifar10/config/tl_dr.yaml --trial 0 --stages_module tests.task.cifar10.stages --train --test
+```
+ - `-t` is the name of the task or the experiment. 
+ - `-c` is the relative path to the configuration YAML.
+ - `--trial 5` the trial number for the configuration (default=0).
+ - `--stages_module` path to the module containing `stages()`. It execute the stages of model development, e.g., training and testing (see `tests/task/cifar10/stages.py` for an example stages module).
+ - `--train` and `--test` flags are used in `stages()` to indicate that training and testing should be performed.
+
+ The configuration YAML (`tests/task/cifar10/config/tl_dr.yaml`):
+
+ ```yaml
+module: tests.task.cifar10.model.baseline
+definition: Baseline
+exp_dir: /datasets/work/hb-mlaifsp-mm/work/experiments
+monitor: val_acc
+monitor_mode: max
+
+# Inputs to Lightning module:
+dataset_dir: /datasets/work/hb-mlaifsp-mm/work/datasets
+lr: 1e-3
+max_epochs: 1
+mbatch_size: 32
+ ```
+
+Must include:
+- `module` is the module containing the `definition`, which is the name of the Lightning module.
+- `exp_dir` is the path to the experiment directory, all outputs are saved here.
+- `monitor` validation metric to monitor.
+- `monitor_mode` whether higher (`max`) or lower (`min`) values are better.
+
+The remaining arguments depend on your Lightning module's `__init__` keyword arguments.
 # Table of Contents
 
 [//]: # (- [How to structure your project]&#40;#how-to-structure-your-project&#41;)
@@ -65,14 +100,11 @@ pip install dlhpcstarter
 
 # Package map
 
----
-
 The package is structured as follows:
 
 ```
 ├──  dlhpcstarter
 │    │
-│    ├── tools                     - for all other modules; tools that are repeadetly used.
 │    ├── __main__.py               - __main__.py does the following:
 │    │                                    1. Reads command line arguments using argparse.
 │    │                                    2. Imports the 'stages' function for the task from task/
@@ -87,9 +119,6 @@ The package is structured as follows:
 ```
 
 # Tasks
-
----
-
 
 ***Tasks can have any name. The name could be based on the data or the type of inference being made***. For example:
 - Two tasks have the same data but require different names due to differing predictions, e.g., **MS-COCO Detection** and **MS-COCO Caption**.
@@ -107,9 +136,6 @@ The package is structured as follows:
 It is used to separate the outputs of the experiment from other tasks.
 
 # Models
-
----
-
 
 ***Please familiarise yourself with the [`Lightning LightningModule`](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#) in order to correctly implement a model:*** https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
 
@@ -131,7 +157,6 @@ A model is created using a [`Lightning LightningModule`](https://pytorch-lightni
 
 # Development via Model Composition and Inheritance
 
----
 To promote rapid development of models, one solution is to use class composition and/or inheritance. ***For example, we may have a baseline that not only includes a basic model, but also the data pipeline:***
 
 ```python
@@ -259,13 +284,12 @@ class Composite(LightningModule):
 
 # Configuration YAML files and argparse
 
----
-
-
 Currently, there are two methods for giving arguments:
 
 1. **Via command line arguments using the [`argparse` module](https://docs.python.org/3/library/argparse.html)**. `argparse` mainly handles paths, development stage flags (e.g., training and testing flags), and cluster manager arguments.
 2. **Via a configuration file stored in [`YAML` format](https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started)**. Can handle all the arguments defined by the `argparse` plus more, including hyperparameters for the model.
+
+### NOTE: Command line arguments will override configuration arguments!
 
 ***The mandatory arguments include:***
 1. `task`, the name of the task.
@@ -287,8 +311,6 @@ dlhpcstarter --config task/cifar10/config/baseline --task cifar10
 For each model of a task, we define a configuration. Hyperparameters, paths, as well as the device configuration can be stored in a configuration file. Configurations are in [`YAML` format](https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started), e.g., `task/cifar10/config/baseline.yaml`.
 
 # Development via Configuration Files
-
----
 
 If we have the following configuration file for the aforementioned CIFAR10  `Baseline` model, `task/cifar10/config/baseline.yaml`:
 
@@ -329,8 +351,6 @@ dlhpcstarter --config task/cifar10/config/baseline_rev_a --task cifar10
 ```
 
 # Next level: Configuration composition via Hydra
-
----
 
 If your new configuration only modifies a few arguments of another configuration file, you can take advantage of the composition feature of [Hydra](https://hydra.cc/). This makes creating `task/cifar10/config/baseline_rev_a.yaml` from the previous section easy. We simply add the arguments from `task/cifar10/config/baseline.yaml` by adding its name to the `defaults` list:
 
@@ -451,9 +471,6 @@ See the following documentation for more information:
 
 # Stages and Trainer
 
----
-
-
 In each task directory is a Python module called `stages.py`, which contains the `stages` definition. This definition takes an object as input that houses the configuration for a job.
 
 Typically, the following things happen in `stages()`:
@@ -484,11 +501,7 @@ https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-c
 
 # Tying it all together: `dlhpcstarter`
 
----
-
 ***This is an overview of what occurs when the entrypoint `dlhpcstarter` is executed, this is not necessary to understand to use the package.***
-
-
 
 `dlhpcstarter` does the following:
 
@@ -501,8 +514,6 @@ https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#trainer-c
 - Submits `stages` to the cluster manager if `args.submit = True` or runs `stages` locally. The command line arguments and the configuration arguments are passed to `stages` in both cases.
 
 # Cluster manager and distributed computing
-
----
 
 The following arguments are used for distributed computing:
 
@@ -577,18 +588,12 @@ The [PyTorch Lightning Trainer](https://pytorch-lightning.readthedocs.io/en/stab
 
 # Where all the outputs go: `exp_dir`
 
----
-
 The experiments directory is where all your outputs will be saved, including model checkpoints, metric scores. This is also where the cluster manager script, as well as where stderr and stdout are saved.
 
 Note: the trial number also sets the seed number for your experiment.
 
-***Description to be finished.
-
-
 # Repository Wish List
 
----
 - Transfer cluster management over to submitit: https://ai.facebook.com/blog/open-sourcing-submitit-a-lightweight-tool-for-slurm-cluster-computation/
 - Add description about how to use https://neptune.ai/.
 - Use https://hydra.cc/ instead of argparse (or have the option to use either).

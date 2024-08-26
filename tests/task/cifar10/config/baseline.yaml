@@ -3,11 +3,13 @@ defaults:
   - ancillary/2hr@_global_
   - _self_
 
-module: task.cifar10.model.baseline
+devices: 1
+
+module: tests.task.cifar10.model.baseline
 definition: Baseline
-monitor: 'val_acc'
-monitor_mode: 'max'
+monitor: val_acc
+monitor_mode: max
 
 lr: 1e-3
-max_epochs: 3
+max_epochs: 1
 mbatch_size: 32

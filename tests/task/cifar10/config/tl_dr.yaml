@@ -1,0 +1,12 @@
+module: tests.task.cifar10.model.baseline
+definition: Baseline
+
+exp_dir: /datasets/work/hb-mlaifsp-mm/work/experiments
+dataset_dir: /datasets/work/hb-mlaifsp-mm/work/datasets
+
+monitor: val_acc
+monitor_mode: max
+
+lr: 1e-3
+max_epochs: 1 
+mbatch_size: 32

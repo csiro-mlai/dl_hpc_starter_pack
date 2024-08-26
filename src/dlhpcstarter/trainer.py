@@ -2,10 +2,7 @@ import hashlib
 import inspect
 import logging
 import os
-import signal
 import time
-import uuid
-from datetime import timedelta
 from typing import Optional
 
 import torch
@@ -61,7 +58,6 @@ def trainer_instance(
     plugins: Optional[list] = None,
     enable_progress_bar: Optional[bool] = None,
     one_epoch_only: bool = False,
-    learning_rate_monitor: bool = False,
     # disable_slurm_environment: bool = False,
     mlflow_logger: bool = False,
     **kwargs,
@@ -111,8 +107,6 @@ def trainer_instance(
         kwargs - keyword arguments for Trainer.
         enable_progress_bar - show the progress bar (will be turned off for submissions).
         one_epoch_only - perform only one epoch of training.
-        learning_rate_monitor - add the LearningRateMonitor as a callback.
-        # disable_slurm_environment - disable Lightning's SLURMEnvironment.
     """
     accumulate_grad_batches = None
     loggers = [] if loggers is None else loggers
@@ -284,26 +278,23 @@ def trainer_instance(
         )
 
     # Learning rate monitor:
-    if learning_rate_monitor:
-        callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
+    callbacks.append(LearningRateMonitor(log_momentum=True, log_weight_decay=True))
 
     # Perform only one epoch of training:
     if one_epoch_only:
         assert not early_stopping, 'one_epoch_only is not setup for early_stopping'
+        assert 'val_check_interval' not in kwargs, 'val_check_interval is not setup for early_stopping'
 
         class OneEpochOnlyCallback(Callback):
-            # def __init__(self, neptune_api_key=None):
             def __init__(self, submit):
                 self.start_time = time.time()
                 self.submit = submit
-                # self.neptune_api_key=neptune_api_key
             def on_validation_epoch_end(self, trainer, pl_module):
                 trainer.should_stop = True
                 pl_module.trainer.should_stop = True
             def on_train_end(self, trainer, pl_module):
                 elapsed_time = (time.time() - self.start_time) / 3600
                 print(f'Training epoch elapsed time (hours): {elapsed_time}')
-            #     pl_module.log('elapsed_time_hours', elapsed_time / 3600, on_step=True, on_epoch=False)
             def teardown(self, trainer, pl_module, stage):
                 done = _is_max_limit_reached(trainer.fit_loop.epoch_progress.current.processed, trainer.fit_loop.max_epochs)
                 if stage == 'fit' and self.submit and not done:
@@ -314,6 +305,56 @@ def trainer_instance(
                     if rank_0:
                         ClusterSubmit.sig_handler('one_epoch_only', None)
         callbacks.append(OneEpochOnlyCallback(submit=submit))
+
+    class TimePerEpochCallback(Callback):
+        def __init__(self):
+            super().__init__()
+            self.start_time = None
+
+        def on_train_epoch_start(self, trainer, pl_module):
+            self.train_epoch_start_time = time.time()
+
+        def on_train_epoch_end(self, trainer, pl_module):
+            pl_module.log('train_epoch_hrs', (time.time() - self.train_epoch_start_time) / 3600)
+
+        def on_validation_epoch_start(self, trainer, pl_module):
+            self.validation_epoch_start_time = time.time()
+
+        def on_validation_epoch_end(self, trainer, pl_module):
+            pl_module.log('val_epoch_hrs', (time.time() - self.validation_epoch_start_time) / 3600)
+    callbacks.append(TimePerEpochCallback())
+
+    class MaxGPUVRAMCallback(Callback):
+        def __init__(self):
+            self.max_train_vram = 0
+            self.max_val_vram = 0
+
+        def on_train_epoch_start(self, trainer, pl_module):
+            self.max_train_vram = 0
+
+        def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+            current_vram = torch.cuda.max_memory_allocated()
+            if current_vram > self.max_train_vram:
+                self.max_train_vram = current_vram
+            torch.cuda.reset_max_memory_allocated()
+
+        def on_train_epoch_end(self, trainer, pl_module):
+            max_train_vram_gb = self.max_train_vram / (1024 ** 3)
+            pl_module.log('train_max_gpu_vram_gb', max_train_vram_gb, prog_bar=True)
+
+        def on_validation_epoch_start(self, trainer, pl_module):
+            self.max_val_vram = 0
+
+        def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+            current_vram = torch.cuda.max_memory_allocated()
+            if current_vram > self.max_val_vram:
+                self.max_val_vram = current_vram
+            torch.cuda.reset_max_memory_allocated()
+
+        def on_validation_epoch_end(self, trainer, pl_module):
+            max_val_vram_gb = self.max_val_vram / (1024 ** 3) 
+            pl_module.log('val_max_gpu_vram_gb', max_val_vram_gb, prog_bar=True)
+    callbacks.append(MaxGPUVRAMCallback())
 
     # Accumulate gradient batches
     if accumulated_mbatch_size:

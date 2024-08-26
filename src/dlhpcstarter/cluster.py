@@ -277,35 +277,11 @@ class ClusterSubmit(object):
             script.append(cmd)
 
 
-        """
-        Below is not needed completely as we save the arguments to file now.
-        Would only need to pass a few arguments, like task and config.
-        This would alleviate the issue with the store_true argparse arguments.
-        e.g.,
-        
-        cmd_line_args = f'--manager_script_path {manager_script_path}'
-        cmd_line_args = f'--task {args.task}'
-        cmd_line_args = f'--config {args.config}'
-        cmd_line_args = f'--trial {args.trial}'
-
-        its just so it can find: 
-
-        args_path = os.path.join(args_dir, f'session_{session}.yaml')
-        
-        i.e.: exp_dir_trial.
-        
-        Then no need for None in command line arguments.
-
-        """
         cmd_line_args = []
-        for k, v in self.cmd_line_args.items():
-            if v is not None:
-                v_str = str(v)
-                if '[' in v_str or ';' in v_str or ' ' in v_str:
-                    option = f'--{k} \"{v}\"'
-                else:
-                    option = f'--{k} {v}'
-                cmd_line_args.append(option)
+        cmd_line_args.append(f'--task {self.cmd_line_args["task"]}')
+        cmd_line_args.append(f'--config {self.cmd_line_args["config"]}')
+        cmd_line_args.append(f'--trial {self.cmd_line_args["trial"]}')
+        cmd_line_args.append('--submit')
         cmd_line_args = ' '.join(cmd_line_args)
 
         cmd_line_args = f'{cmd_line_args} --manager_script_path {manager_script_path}'
