@@ -97,10 +97,16 @@ def read_command_line_arguments():
         help="Checkpoint to resume training from",
     )
     training_arguments.add_argument(
+        "--warm-start-other-exp-trial-dir",
+        "--warm_start_other_exp_trial_dir",
+        type=str,
+        help="Other configuration's experiment trial directory to be used for warm starting",
+    )
+    training_arguments.add_argument(
         "--warm-start-ckpt-path",
         "--warm_start_ckpt_path",
         type=str,
-        help="Checkpoint for warm-starting",
+        help="Checkpoint for warm starting",
     )
     training_arguments.add_argument("--monitor", type=str, help="Metric to monitor")
     training_arguments.add_argument(

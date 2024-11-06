@@ -3,6 +3,7 @@ import inspect
 import logging
 import os
 import time
+import warnings
 from typing import Optional
 
 import torch
@@ -285,6 +286,7 @@ def trainer_instance(
         assert not early_stopping, 'one_epoch_only is not setup for early_stopping'
         assert 'val_check_interval' not in kwargs, 'val_check_interval is not setup for early_stopping'
 
+
         class OneEpochOnlyCallback(Callback):
             def __init__(self, submit):
                 self.start_time = time.time()
@@ -304,7 +306,10 @@ def trainer_instance(
                             rank_0 = False
                     if rank_0:
                         ClusterSubmit.sig_handler('one_epoch_only', None)
+                        
+                        
         callbacks.append(OneEpochOnlyCallback(submit=submit))
+
 
     class TimePerEpochCallback(Callback):
         def __init__(self):
@@ -322,7 +327,10 @@ def trainer_instance(
 
         def on_validation_epoch_end(self, trainer, pl_module):
             pl_module.log('val_epoch_hrs', (time.time() - self.validation_epoch_start_time) / 3600)
+
+
     callbacks.append(TimePerEpochCallback())
+
 
     class MaxGPUVRAMCallback(Callback):
         def __init__(self):
@@ -354,7 +362,10 @@ def trainer_instance(
         def on_validation_epoch_end(self, trainer, pl_module):
             max_val_vram_gb = self.max_val_vram / (1024 ** 3) 
             pl_module.log('val_max_gpu_vram_gb', max_val_vram_gb, prog_bar=True)
+            
+            
     callbacks.append(MaxGPUVRAMCallback())
+
 
     # Accumulate gradient batches
     if accumulated_mbatch_size:

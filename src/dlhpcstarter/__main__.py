@@ -141,31 +141,29 @@ def main() -> None:
         def format_dict(d, ignore=None):
             parts = []
             for key, value in d.items():
-                if is_path(value) or key in ignore:
+                if is_path(value) or (ignore and key in ignore):
                     continue
-                if isinstance(value, ListConfig):
+                if isinstance(value, list):
                     value = '_'.join(map(str, value))
                 parts.append(f'{key}_{value}')
             return '_'.join(parts)
 
-        # Get the length of the first list in the dictionary to compare against:
-        first_list_len = len(next(iter(args.search_space.values())))
-
-        # Assert that all lists in the dictionary have the same length:
-        assert all(len(i) == first_list_len for i in args.search_space.values()), "Not all lists in the search space have the same length."
-
         base_config_name = args.config_name
-        keys, lists = zip(*args.search_space.items())
-        for values in zip(*lists):
+        for config in args.search_space:
             args_copy = copy.deepcopy(args)
             cmd_line_args_copy = copy.deepcopy(args)
-            config_changes = dict(zip(keys, values))
-            for key, value in config_changes.items():
-                setattr(args_copy, key, value)
             
-            args_copy.config_name = base_config_name + '_' + format_dict(config_changes, args.search_space_ignore_keys)
+            config_name_suffix = format_dict(config, args.search_space_ignore_keys)
+            args_copy.config_name = f"{base_config_name}_{config_name_suffix}"
+            
+            for k, v in config.items():
+                setattr(args_copy, k, v)
+            
             print(f'Running search config: {args_copy.config_name}')
-            args_copy.exp_dir_trial = os.path.join(args_copy.exp_dir, args_copy.task, args_copy.config_name, 'trial_' + f'{args_copy.trial}')
+            
+            args_copy.exp_dir_trial = os.path.join(
+                args_copy.exp_dir, args_copy.task, args_copy.config_name, f'trial_{args_copy.trial}'
+            )
             cmd_line_args_copy.exp_dir_trial = args_copy.exp_dir_trial
             
             del args_copy.search_space

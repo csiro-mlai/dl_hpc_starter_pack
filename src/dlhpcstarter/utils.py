@@ -60,7 +60,7 @@ def load_config_and_update_args(
     cmd_line_args: Namespace, print_args: bool = False
 ) -> None:
     """
-    Loads the configuration .yaml file and updates the args object.
+    Loads the configuration YAML file and updates the args object.
 
     Argument/s:
         cmd_line_args - command line arguments object.
@@ -75,11 +75,17 @@ def load_config_and_update_args(
         args.work_dir = os.getcwd()
 
     # Configuration:
-    if args.config.endswith(".yaml"):
+    if args.config.endswith((".yaml", ".yml")):
         args.config_file_name = args.config
-        args.config = args.config.replace(".yaml", "")
+        args.config = args.config.rsplit(".", 1)[0]
     else:
-        args.config_file_name = args.config + ".yaml"
+        if os.path.exists(os.path.join(args.work_dir, args.config + ".yaml")):
+            args.config_file_name = args.config + ".yaml"
+        elif os.path.exists(os.path.join(args.work_dir, args.config + ".yml")):
+            args.config_file_name = args.config + ".yml"
+        else:
+            raise FileNotFoundError(f"Configuration file not found (with either .yml or .yaml as the extension): {args.config}.")
+
     args.config_name = Path(args.config).parts[-1]
 
     # Load configuration using Hydra's Compose API:
@@ -150,90 +156,90 @@ def load_config_and_update_args(
     return args, cmd_line_args
 
 
-def load_config_and_update_args_rev_a(
-    cmd_line_args: Namespace, print_args: bool = False
-) -> None:
-    """
-    Loads the configuration .yaml file and updates the args object.
+# def load_config_and_update_args_rev_a(
+#     cmd_line_args: Namespace, print_args: bool = False
+# ) -> None:
+#     """
+#     Loads the configuration .yaml file and updates the args object.
 
-    Argument/s:
-        cmd_line_args - command line arguments object.
-        print_args - print the arguments for the job.
-    """
-    # Make a deepcopy of the command line arguments:
-    args = copy.deepcopy(cmd_line_args)
+#     Argument/s:
+#         cmd_line_args - command line arguments object.
+#         print_args - print the arguments for the job.
+#     """
+#     # Make a deepcopy of the command line arguments:
+#     args = copy.deepcopy(cmd_line_args)
 
-    # Process configuration file paths
-    args.work_dir = (
-        args.work_dir if hasattr(args, "work_dir") and args.work_dir else os.getcwd()
-    )
-    args.config_file_name = args.config + (
-        "" if args.config.endswith(".yaml") else ".yaml"
-    )
-    args.config_name = Path(args.config).stem
-    args.config_dir = Path(args.config).parent
-    args.config_dir = (
-        os.path.join(args.work_dir, args.config_dir)
-        if not os.path.isabs(args.config_dir)
-        else args.config_dir
-    )
+#     # Process configuration file paths
+#     args.work_dir = (
+#         args.work_dir if hasattr(args, "work_dir") and args.work_dir else os.getcwd()
+#     )
+#     args.config_file_name = args.config + (
+#         "" if args.config.endswith(".yaml") else ".yaml"
+#     )
+#     args.config_name = Path(args.config).stem
+#     args.config_dir = Path(args.config).parent
+#     args.config_dir = (
+#         os.path.join(args.work_dir, args.config_dir)
+#         if not os.path.isabs(args.config_dir)
+#         else args.config_dir
+#     )
 
-    # Load configuration
-    with initialize_config_dir(version_base=None, config_dir=str(args.config_dir)):
-        config = compose(config_name=args.config_name)
+#     # Load configuration
+#     with initialize_config_dir(version_base=None, config_dir=str(args.config_dir)):
+#         config = compose(config_name=args.config_name)
 
-    # Update args with config, overwriting config with cmd_line_args:
-    for k, v in config.items():
-        if hasattr(args, k) and getattr(args, k) is not None:
-            continue
-        setattr(args, k, v)
+#     # Update args with config, overwriting config with cmd_line_args:
+#     for k, v in config.items():
+#         if hasattr(args, k) and getattr(args, k) is not None:
+#             continue
+#         setattr(args, k, v)
 
-    # Check for critical attributes:
-    critical_keys = ["module", "definition", "exp_dir"]
-    for key in critical_keys:
-        assert hasattr(args, key) and getattr(
-            args, key
-        ), f'"{key}" must be specified as a command line argument or in {args.config_file_name}.'
+#     # Check for critical attributes:
+#     critical_keys = ["module", "definition", "exp_dir"]
+#     for key in critical_keys:
+#         assert hasattr(args, key) and getattr(
+#             args, key
+#         ), f'"{key}" must be specified as a command line argument or in {args.config_file_name}.'
 
-    # Set defaults:
-    args.num_workers = (
-        args.num_workers
-        if hasattr(args, "num_workers") and args.num_workers is not None
-        else 0
-    )
-    args.num_nodes = (
-        args.num_nodes
-        if hasattr(args, "num_nodes") and args.num_nodes is not None
-        else 1
-    )
-    args.trial = args.trial if hasattr(args, "trial") and args.trial is not None else 0
-    args.resume_last, args.auto_resubmit = True, True
+#     # Set defaults:
+#     args.num_workers = (
+#         args.num_workers
+#         if hasattr(args, "num_workers") and args.num_workers is not None
+#         else 0
+#     )
+#     args.num_nodes = (
+#         args.num_nodes
+#         if hasattr(args, "num_nodes") and args.num_nodes is not None
+#         else 1
+#     )
+#     args.trial = args.trial if hasattr(args, "trial") and args.trial is not None else 0
+#     args.resume_last, args.auto_resubmit = True, True
 
-    # Update the experiment directory to include trial information
-    args.exp_dir_trial = os.path.join(
-        args.exp_dir, args.task, args.config_name, f"trial_{args.trial}"
-    )
-    Path(args.exp_dir_trial).mkdir(parents=True, exist_ok=True)
+#     # Update the experiment directory to include trial information
+#     args.exp_dir_trial = os.path.join(
+#         args.exp_dir, args.task, args.config_name, f"trial_{args.trial}"
+#     )
+#     Path(args.exp_dir_trial).mkdir(parents=True, exist_ok=True)
 
-    # Conditional settings based on args properties
-    if hasattr(args, "resume_ckpt_path") or hasattr(args, "resume_epoch"):
-        args.resume_last, args.auto_resubmit = False, False
+#     # Conditional settings based on args properties
+#     if hasattr(args, "resume_ckpt_path") or hasattr(args, "resume_epoch"):
+#         args.resume_last, args.auto_resubmit = False, False
 
-    # Adjust auto_resubmit based on one_epoch_only
-    if (
-        hasattr(args, "one_epoch_only")
-        and args.one_epoch_only
-        and args.auto_resubmit_method != "timeout"
-    ):
-        args.auto_resubmit = False
+#     # Adjust auto_resubmit based on one_epoch_only
+#     if (
+#         hasattr(args, "one_epoch_only")
+#         and args.one_epoch_only
+#         and args.auto_resubmit_method != "timeout"
+#     ):
+#         args.auto_resubmit = False
 
-    if print_args:
-        print(f"args: {vars(args)}")
+#     if print_args:
+#         print(f"args: {vars(args)}")
 
-    # Print GPU usage and set GPU visibility:
-    gpu_visibility(args.cuda_visible_devices, args.submit)
+#     # Print GPU usage and set GPU visibility:
+#     gpu_visibility(args.cuda_visible_devices, args.submit)
 
-    return args, cmd_line_args
+#     return args, cmd_line_args
 
 
 def get_epoch_ckpt_path(
@@ -287,13 +293,7 @@ def get_best_ckpt_path(
     extension = list(extension) if isinstance(extension, str) else extension
 
     ckpt_list = list(
-        OrderedDict.fromkeys(
-            [
-                j
-                for i in extension
-                for j in glob.glob(os.path.join(exp_dir_trial, f"*=*{monitor}=*{i}"))
-            ]
-        )
+        OrderedDict.fromkeys([j for i in extension for j in glob.glob(os.path.join(exp_dir_trial, f"*=*{monitor}=*{i}"))])
     )
 
     if not ckpt_list:

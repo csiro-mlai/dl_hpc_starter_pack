@@ -281,6 +281,8 @@ class ClusterSubmit(object):
         cmd_line_args.append(f'--task {self.cmd_line_args["task"]}')
         cmd_line_args.append(f'--config {self.cmd_line_args["config"]}')
         cmd_line_args.append(f'--trial {self.cmd_line_args["trial"]}')
+        if self.cmd_line_args["exp_dir_trial"] is not None:
+            cmd_line_args.append(f'--exp_dir_trial {self.cmd_line_args["exp_dir_trial"]}')
         cmd_line_args.append('--submit')
         cmd_line_args = ' '.join(cmd_line_args)
 
